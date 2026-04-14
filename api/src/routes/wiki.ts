@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../lib/db.js';
 import { wikiPages, wikiLinks, wikiPageChunks, wikiPageVersions, sourceChunks, sources } from '../db/schema/index.js';
 import { eq, and, isNull, sql, inArray, desc } from 'drizzle-orm';
+import { cacheGet, cacheSet, cacheInvalidate, CACHE_KEYS } from '../lib/cache.js';
 
 const app = new Hono();
 
@@ -31,6 +32,10 @@ app.get('/', async (c) => {
 app.get('/by-slug/:slug', async (c) => {
   const workspaceId = c.req.param('workspaceId')!;
   const slug = c.req.param('slug')!;
+
+  const cacheKey = CACHE_KEYS.wikiPage(workspaceId, slug);
+  const cached = await cacheGet<Record<string, unknown>>(cacheKey);
+  if (cached) return c.json({ data: cached });
 
   const page = await db.query.wikiPages.findFirst({
     where: and(
@@ -72,14 +77,15 @@ app.get('/by-slug/:slug', async (c) => {
     }
   }
 
-  return c.json({
-    data: {
+  const responseData = {
       ...page,
       sources: pageSources,
       links: outgoing.map((l) => l.targetPage),
       backlinks: incoming.map((l) => l.sourcePage),
-    },
-  });
+  };
+
+  await cacheSet(cacheKey, responseData);
+  return c.json({ data: responseData });
 });
 
 app.get('/graph', async (c) => {

@@ -4,6 +4,8 @@ import { eq, and, isNull, sql } from 'drizzle-orm';
 import { generateEmbedding } from '../llm/invoke.js';
 import { defaultConfig, type TenantLLMConfig } from '../llm/provider.js';
 import { RRF_K, SEARCH_TOP_K } from '@llm-wiki/shared';
+import { cacheGet, cacheSet, CACHE_KEYS } from '../lib/cache.js';
+import { createHash } from 'crypto';
 
 export interface SearchHit {
   id: string;
@@ -22,13 +24,20 @@ export async function hybridSearch(
   llmConfig?: TenantLLMConfig,
 ): Promise<SearchHit[]> {
   const config = llmConfig ?? defaultConfig;
+  const queryHash = createHash('sha256').update(query.toLowerCase().trim()).digest('hex').slice(0, 16);
+  const cacheKey = CACHE_KEYS.queryResult(workspaceId, queryHash);
+
+  const cached = await cacheGet<SearchHit[]>(cacheKey);
+  if (cached) return cached;
 
   const [vectorResults, ftsResults] = await Promise.all([
     vectorSearch(workspaceId, query, limit, config),
     fullTextSearch(workspaceId, query, limit),
   ]);
 
-  return rrfMerge(vectorResults, ftsResults, limit);
+  const results = rrfMerge(vectorResults, ftsResults, limit);
+  await cacheSet(cacheKey, results, 3600);
+  return results;
 }
 
 async function vectorSearch(
