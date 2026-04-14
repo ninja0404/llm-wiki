@@ -11,17 +11,24 @@ interface RateLimitConfig {
 async function checkRateLimit(key: string, windowMs: number, maxRequests: number): Promise<{ allowed: boolean; remaining: number; resetMs: number }> {
   try {
     const now = Date.now();
-    const windowKey = `ratelimit:${key}:${Math.floor(now / windowMs)}`;
+    const windowKey = `ratelimit:${key}`;
 
-    const current = await redis.incr(windowKey);
-    if (current === 1) {
-      await redis.pexpire(windowKey, windowMs);
+    const multi = redis.multi();
+    multi.zremrangebyscore(windowKey, 0, now - windowMs);
+    multi.zadd(windowKey, now, `${now}:${Math.random().toString(36).slice(2, 8)}`);
+    multi.zcard(windowKey);
+    multi.pexpire(windowKey, windowMs);
+    const results = await multi.exec();
+
+    const count = (results?.[2]?.[1] as number) || 0;
+    const remaining = Math.max(0, maxRequests - count);
+
+    if (count > maxRequests) {
+      await redis.zrem(windowKey, `${now}:${Math.random().toString(36).slice(2, 8)}`);
+      return { allowed: false, remaining: 0, resetMs: windowMs };
     }
 
-    const remaining = Math.max(0, maxRequests - current);
-    const resetMs = windowMs - (now % windowMs);
-
-    return { allowed: current <= maxRequests, remaining, resetMs };
+    return { allowed: true, remaining, resetMs: windowMs };
   } catch {
     return { allowed: true, remaining: maxRequests, resetMs: 0 };
   }

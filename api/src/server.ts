@@ -215,6 +215,9 @@ workspaceScoped.route('/export', exportRoutes);
 import commentsRoutes from './routes/comments.js';
 workspaceScoped.route('/', commentsRoutes);
 
+import workspaceSettingsRoutes from './routes/workspace-settings.js';
+workspaceScoped.route('/settings', workspaceSettingsRoutes);
+
 app.route('/api/workspaces/:workspaceId', workspaceScoped);
 
 // ── Start ──

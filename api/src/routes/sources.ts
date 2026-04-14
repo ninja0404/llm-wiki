@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../lib/db.js';
 import { sources, workspaces, wikiPageChunks, sourceChunks, wikiPages, activityLogs } from '../db/schema/index.js';
 import { eq, and, inArray, sql } from 'drizzle-orm';
+import { publishMessage } from '../lib/ws.js';
 import { createHash } from 'crypto';
 import { validateUrl, fetchUrl, SsrfError } from '../lib/ssrf.js';
 import { uploadFile } from '../lib/storage.js';
@@ -182,6 +183,13 @@ app.delete('/:id', async (c) => {
     entityId: id,
     details: { title: source.title, affectedPages: affectedPageIds.length },
   });
+
+  if (affectedPageIds.length > 0) {
+    await publishMessage(workspaceId, {
+      type: 'flagged:alert',
+      payload: { workspaceId, pendingCount: affectedPageIds.length },
+    });
+  }
 
   return c.json({ data: { deleted: true, affectedPages: affectedPageIds.length } });
 });
