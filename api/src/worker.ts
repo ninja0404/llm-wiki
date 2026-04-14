@@ -67,7 +67,7 @@ const ingestWorker = new Worker(
           logger.info({ sourceId, nextBatch }, 'Enqueuing next extract batch');
           await ingestQueue.add(
             'extract-batch',
-            { sourceId, workspaceId, batchIndex: nextBatch, traceId, totalBatches },
+            { sourceId, workspaceId, batchIndex: nextBatch, traceId, totalBatches, llmConfig: job.data.llmConfig },
             { jobId: `extract-${sourceId}-${nextBatch}` },
           );
         }

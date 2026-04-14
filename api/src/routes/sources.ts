@@ -230,7 +230,13 @@ async function createSource(
   // Tenant-level concurrency limit
   const ws = await db.query.workspaces.findFirst({
     where: eq(workspaces.id, workspaceId),
-    columns: { organizationId: true },
+    columns: {
+      organizationId: true,
+      llmProvider: true,
+      llmModel: true,
+      llmApiKeyEncrypted: true,
+      llmBaseUrl: true,
+    },
   });
   if (ws) {
     const key = `tenant:${ws.organizationId}:ingest:active`;
@@ -266,9 +272,16 @@ async function createSource(
     })
     .returning();
 
+  const llmConfig = ws?.llmProvider && ws.llmApiKeyEncrypted ? {
+    provider: ws.llmProvider,
+    model: ws.llmModel || 'gpt-4o-mini',
+    encryptedApiKey: ws.llmApiKeyEncrypted,
+    baseUrl: ws.llmBaseUrl || undefined,
+  } : undefined;
+
   await ingestQueue.add(
     'extract-batch',
-    { sourceId: source.id, workspaceId, batchIndex: 0, traceId, totalBatches },
+    { sourceId: source.id, workspaceId, batchIndex: 0, traceId, totalBatches, llmConfig },
     { jobId: `extract-${source.id}-0` },
   );
 

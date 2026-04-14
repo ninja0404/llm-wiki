@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../lib/db.js';
-import { sources } from '../db/schema/index.js';
+import { sources, workspaces } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { ingestQueue } from '../jobs/queues.js';
 import { logger } from '../lib/logger.js';
@@ -30,6 +30,17 @@ app.post('/:id/retry', async (c) => {
 
   const traceId = crypto.randomUUID();
 
+  const ws = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, source.workspaceId),
+    columns: { llmProvider: true, llmModel: true, llmApiKeyEncrypted: true, llmBaseUrl: true },
+  });
+  const llmConfig = ws?.llmProvider && ws.llmApiKeyEncrypted ? {
+    provider: ws.llmProvider,
+    model: ws.llmModel || 'gpt-4o-mini',
+    encryptedApiKey: ws.llmApiKeyEncrypted,
+    baseUrl: ws.llmBaseUrl || undefined,
+  } : undefined;
+
   for (const batchIndex of state.failedBatches) {
     await ingestQueue.add(
       'extract-batch',
@@ -39,6 +50,7 @@ app.post('/:id/retry', async (c) => {
         batchIndex,
         traceId,
         totalBatches: state.totalBatches,
+        llmConfig,
       },
       { jobId: `extract-retry-${source.id}-${batchIndex}-${Date.now()}` },
     );
