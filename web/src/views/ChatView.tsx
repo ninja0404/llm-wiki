@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Send, MessageSquare, Plus, Loader2, BookPlus, Trash2 } from 'lucide-react';
+import { Send, MessageSquare, Plus, Loader2, BookPlus, Trash2, Copy, Check, Bot, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useWorkspaceStore } from '@/store/workspace';
+import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,9 @@ interface Message {
 
 export function ChatView() {
   const { currentWorkspace } = useWorkspaceStore();
+  const { user } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [currentConvId, setCurrentConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -241,15 +244,26 @@ export function ChatView() {
           ) : (
             <div className="mx-auto max-w-2xl space-y-4">
               {messages.map((msg) => (
-                <div key={msg.id} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div
-                    className={cn(
-                      'max-w-[80%] rounded-2xl px-4 py-3 text-sm',
-                      msg.role === 'user'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-zinc-100 dark:bg-zinc-800',
-                    )}
-                  >
+                <div key={msg.id} className={cn('group flex gap-3', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+                  <div className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                    msg.role === 'user' ? 'bg-primary-600 text-white' : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300',
+                  )}>
+                    {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                  </div>
+                  <div className="max-w-[80%]">
+                    <div className={cn('mb-1 flex items-center gap-2 text-[10px] text-zinc-400', msg.role === 'user' ? 'justify-end' : '')}>
+                      <span>{msg.role === 'user' ? (user?.name || 'You') : 'AI Assistant'}</span>
+                      <span>{new Date(msg.createdAt).toLocaleTimeString()}</span>
+                    </div>
+                    <div
+                      className={cn(
+                        'relative rounded-2xl px-4 py-3 text-sm',
+                        msg.role === 'user'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-zinc-100 dark:bg-zinc-800',
+                      )}
+                    >
                     {msg.role === 'assistant' ? (
                       <div>
                         <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -292,6 +306,19 @@ export function ChatView() {
                     ) : (
                       msg.content
                     )}
+                    {msg.role === 'assistant' && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.content);
+                          setCopiedId(msg.id);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        className="absolute -bottom-6 right-0 hidden items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 group-hover:flex"
+                      >
+                        {copiedId === msg.id ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+                      </button>
+                    )}
+                    </div>
                   </div>
                 </div>
               ))}
