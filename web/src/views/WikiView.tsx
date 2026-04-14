@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import ReactMarkdown from 'react-markdown';
-import { Book, ArrowLeft, ExternalLink, Tag, History, Clock, GitCompare } from 'lucide-react';
+import { Book, ArrowLeft, ExternalLink, Tag, History, Clock, GitCompare, MessageCircle, Send } from 'lucide-react';
 import { diffLines, type Change } from 'diff';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useWorkspaceStore } from '@/store/workspace';
 import { useWs } from '@/lib/useWs';
 import { cn } from '@/lib/cn';
@@ -126,7 +128,9 @@ function WikiPageDetail({ slug, workspaceId }: { slug: string; workspaceId?: str
   const [page, setPage] = useState<WikiPageDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [activeTab, setActiveTab] = useState<'content' | 'versions'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'versions' | 'comments'>('content');
+  const [comments, setComments] = useState<{ id: string; userId: string; content: string; resolved: boolean; createdAt: string }[]>([]);
+  const [newComment, setNewComment] = useState('');
   const [versions, setVersions] = useState<VersionEntry[]>([]);
   const [versionsLoaded, setVersionsLoaded] = useState(false);
 
@@ -236,9 +240,73 @@ function WikiPageDetail({ slug, workspaceId }: { slug: string; workspaceId?: str
             <History className="h-3.5 w-3.5" />
             History
           </button>
+          <button
+            onClick={() => {
+              setActiveTab('comments');
+              if (page && workspaceId) {
+                fetch(`/api/workspaces/${workspaceId}/pages/${page.id}/comments`, { credentials: 'include' })
+                  .then((r) => r.json())
+                  .then((d) => setComments(d.data || []))
+                  .catch(() => {});
+              }
+            }}
+            className={cn(
+              'flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+              activeTab === 'comments'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-zinc-500 hover:text-zinc-700',
+            )}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Comments
+          </button>
         </div>
 
-        {activeTab === 'versions' ? (
+        {activeTab === 'comments' ? (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Add a comment... Use @username to mention"
+                className="min-h-[80px]"
+              />
+              <Button
+                size="icon"
+                disabled={!newComment.trim()}
+                onClick={async () => {
+                  if (!page || !workspaceId || !newComment.trim()) return;
+                  const mentions = [...newComment.matchAll(/@(\w+)/g)].map((m) => m[1]);
+                  await fetch(`/api/workspaces/${workspaceId}/pages/${page.id}/comments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ content: newComment, mentions }),
+                  });
+                  setNewComment('');
+                  const res = await fetch(`/api/workspaces/${workspaceId}/pages/${page.id}/comments`, { credentials: 'include' });
+                  const d = await res.json();
+                  setComments(d.data || []);
+                }}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            {comments.length === 0 ? (
+              <p className="py-4 text-center text-sm text-zinc-500">No comments yet.</p>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id} className={cn('rounded-lg border p-3', comment.resolved ? 'border-zinc-200 opacity-60' : 'border-zinc-300')}>
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span>{comment.userId}</span>
+                    <span>{new Date(comment.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-1 text-sm">{comment.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+        ) : activeTab === 'versions' ? (
           <div className="space-y-3">
             {!versionsLoaded ? (
               <div className="flex justify-center py-8">

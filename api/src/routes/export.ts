@@ -2,10 +2,9 @@ import { Hono } from 'hono';
 import { db } from '../lib/db.js';
 import { wikiPages } from '../db/schema/index.js';
 import { eq, and, isNull } from 'drizzle-orm';
-import * as zlib from 'zlib';
-import { promisify } from 'util';
+import archiver from 'archiver';
+import { PassThrough } from 'stream';
 
-const gzip = promisify(zlib.gzip);
 const app = new Hono();
 
 app.get('/markdown', async (c) => {
@@ -23,10 +22,17 @@ app.get('/markdown', async (c) => {
 
   const indexContent = [
     '# Wiki Index\n',
+    `Exported: ${new Date().toISOString()}\n`,
+    `Total pages: ${pages.length}\n`,
+    '',
     ...pages.map((p) => `- [${p.title}](./${p.slug}.md) — ${p.summary || p.pageType}`),
   ].join('\n');
 
-  const archive: Record<string, string> = { 'index.md': indexContent };
+  const passthrough = new PassThrough();
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.pipe(passthrough);
+
+  archive.append(indexContent, { name: 'index.md' });
 
   for (const page of pages) {
     const frontmatter = [
@@ -39,19 +45,25 @@ app.get('/markdown', async (c) => {
       '',
     ].filter(Boolean).join('\n');
 
-    archive[`${page.slug}.md`] = `${frontmatter}\n# ${page.title}\n\n${page.content}`;
+    archive.append(`${frontmatter}\n# ${page.title}\n\n${page.content}`, {
+      name: `${page.slug}.md`,
+    });
   }
 
-  const jsonPayload = JSON.stringify(archive);
-  const compressed = await gzip(Buffer.from(jsonPayload));
+  await archive.finalize();
 
-  c.header('Content-Type', 'application/gzip');
-  c.header('Content-Disposition', 'attachment; filename="wiki-export.json.gz"');
+  c.header('Content-Type', 'application/zip');
+  c.header('Content-Disposition', 'attachment; filename="wiki-export.zip"');
 
-  return c.body(compressed);
+  return new Response(passthrough as unknown as ReadableStream, {
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': 'attachment; filename="wiki-export.zip"',
+    },
+  });
 });
 
-app.get('/pages-json', async (c) => {
+app.get('/json', async (c) => {
   const workspaceId = c.req.param('workspaceId')!;
 
   const pages = await db.query.wikiPages.findMany({
@@ -63,7 +75,6 @@ app.get('/pages-json', async (c) => {
     columns: { id: true, title: true, slug: true, content: true, summary: true, tags: true, pageType: true, updatedAt: true },
   });
 
-  c.header('Content-Type', 'application/json');
   c.header('Content-Disposition', 'attachment; filename="wiki-export.json"');
 
   return c.json({ data: pages, exportedAt: new Date().toISOString(), totalPages: pages.length });
