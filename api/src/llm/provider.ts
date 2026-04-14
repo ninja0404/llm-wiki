@@ -1,4 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
 import type { LanguageModelV1, EmbeddingModel } from 'ai';
 import { decrypt } from '../lib/crypto.js';
 import { config } from '../lib/config.js';
@@ -34,10 +35,7 @@ export function getModel(tenantConfig: TenantLLMConfig): LanguageModelV1 {
     }
 
     case 'anthropic': {
-      const provider = createOpenAI({
-        baseURL: 'https://api.anthropic.com/v1',
-        apiKey,
-      });
+      const provider = createAnthropic({ apiKey });
       return provider(tenantConfig.model) as LanguageModelV1;
     }
 
