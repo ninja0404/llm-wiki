@@ -372,6 +372,7 @@ function WikiPageDetail({ slug, workspaceId }: { slug: string; workspaceId?: str
             )}
           </div>
         ) : (
+        <>
         <div className="prose prose-zinc max-w-none dark:prose-invert">
           <ReactMarkdown
             components={{
@@ -424,6 +425,7 @@ function WikiPageDetail({ slug, workspaceId }: { slug: string; workspaceId?: str
             )}
           </div>
         )}
+        </>
         )}
       </article>
       </div>
