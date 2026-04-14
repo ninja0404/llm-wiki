@@ -96,7 +96,7 @@ app.route('/', metricsRoutes);
 import openapiRoutes from './routes/openapi.js';
 app.route('/api', openapiRoutes);
 
-app.on(['POST', 'GET'], '/api/auth/**', (c) => auth.handler(c.req.raw));
+app.all('/api/auth/*', (c) => auth.handler(c.req.raw));
 
 // ── WebSocket ──
 
@@ -152,6 +152,11 @@ app.use('/api/*', globalRateLimit(RATE_LIMITS.global));
 // ── Protected routes ──
 
 app.use('/api/*', async (c, next) => {
+  if (c.req.path.startsWith('/api/auth/') || c.req.path === '/api/openapi.json') {
+    await next();
+    return;
+  }
+
   const session = await auth.api.getSession({
     headers: c.req.raw.headers,
   });

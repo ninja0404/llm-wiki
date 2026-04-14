@@ -7,6 +7,7 @@ import { config } from './config.js';
 
 export const auth = betterAuth({
   baseURL: config.baseUrl,
+  basePath: '/api/auth',
   database: drizzleAdapter(db, { provider: 'pg' }),
   secret: config.betterAuthSecret,
   emailAndPassword: {
