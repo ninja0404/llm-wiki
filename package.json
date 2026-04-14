@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm run --parallel dev:api dev:worker dev:web",
+    "dev": "pnpm --filter @llm-wiki/api dev & pnpm --filter @llm-wiki/api worker & pnpm --filter @llm-wiki/web dev & wait",
     "build": "pnpm -r build",
     "dev:api": "pnpm --filter @llm-wiki/api dev",
     "dev:web": "pnpm --filter @llm-wiki/web dev",

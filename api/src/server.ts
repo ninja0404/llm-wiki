@@ -249,7 +249,7 @@ function validateProductionSecrets() {
 import { initTracing } from './lib/tracing.js';
 
 async function start() {
-  initTracing();
+  await initTracing();
   validateProductionSecrets();
   await initWsSubscriber();
 
