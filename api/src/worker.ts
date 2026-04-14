@@ -61,6 +61,14 @@ const ingestWorker = new Worker(
             { sourceId, workspaceId, traceId },
             { jobId: `build-wiki-${sourceId}` },
           );
+        } else if (result && batchIndex + 1 < totalBatches) {
+          const nextBatch = batchIndex + 1;
+          logger.info({ sourceId, nextBatch }, 'Enqueuing next extract batch');
+          await ingestQueue.add(
+            'extract-batch',
+            { sourceId, workspaceId, batchIndex: nextBatch, traceId, totalBatches },
+            { jobId: `extract-${sourceId}-${nextBatch}` },
+          );
         }
         return result;
       }

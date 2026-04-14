@@ -192,13 +192,11 @@ async function createSource(
     })
     .returning();
 
-  for (let i = 0; i < totalBatches; i++) {
-    await ingestQueue.add(
-      'extract-batch',
-      { sourceId: source.id, workspaceId, batchIndex: i, traceId, totalBatches },
-      { jobId: `extract-${source.id}-${i}`, priority: i },
-    );
-  }
+  await ingestQueue.add(
+    'extract-batch',
+    { sourceId: source.id, workspaceId, batchIndex: 0, traceId, totalBatches },
+    { jobId: `extract-${source.id}-0` },
+  );
 
   logger.info({ sourceId: source.id, totalBatches, traceId }, 'Ingest jobs enqueued');
   return source;
