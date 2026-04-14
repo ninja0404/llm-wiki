@@ -56,10 +56,11 @@ version: "0.3.0"
 **Requirements:** GAP-01, GAP-02, GAP-03, GAP-04, GAP-05
 
 **Success criteria:**
-1. SourcesView 前端支持文件拖拽上传
-2. Wiki 页面更新时 Redis 缓存正确失效
-3. Embedding 迁移 Job 注册到 Worker 并可执行
-4. Workspace LLM 配置 CRUD API 可用
-5. Lint Worker 有 cron 定时执行配置
+1. shadcn/ui 初始化并替换核心组件 (Button, Card, Dialog, Input)
+2. SourcesView 前端支持文件拖拽上传
+3. Wiki 页面更新时 Redis 缓存正确失效
+4. Embedding 迁移 Job 注册到 Worker 并可执行
+5. Workspace LLM 配置 CRUD API 可用
+6. Lint Worker 有 cron 定时执行配置
 
 **UI hint:** yes

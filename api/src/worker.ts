@@ -4,6 +4,7 @@ import { logger } from './lib/logger.js';
 import { processExtractJob } from './ingest/extract-job.js';
 import { processBuildWikiJob } from './ingest/build-wiki-job.js';
 import { processLintJob } from './lint/lint-job.js';
+import { processEmbeddingMigration } from './ingest/embedding-migrate-job.js';
 import { generateEmbedding, CircuitBreakerOpenError } from './llm/invoke.js';
 import { defaultConfig } from './llm/provider.js';
 import { CIRCUIT_BREAKER_TTL_S } from '@llm-wiki/shared';
@@ -119,6 +120,18 @@ const embeddingWorker = new Worker(
   },
 );
 
+const embeddingMigrateWorker = new Worker(
+  'embedding-migrate',
+  async (job) => {
+    logger.info({ jobId: job.id }, 'Processing embedding migration job');
+    return processEmbeddingMigration(job.data);
+  },
+  {
+    ...connection,
+    concurrency: 1,
+  },
+);
+
 const lintWorker = new Worker(
   'lint',
   async (job) => {
@@ -155,7 +168,7 @@ async function start() {
     logger.debug({ uptime: process.uptime() }, 'Worker heartbeat');
   }, 30_000);
 
-  setupGracefulShutdown([ingestWorker, embeddingWorker, lintWorker]);
+  setupGracefulShutdown([ingestWorker, embeddingWorker, lintWorker, embeddingMigrateWorker]);
 
   ingestWorker.on('completed', async (job) => {
     logger.info({ jobId: job.id, name: job.name }, 'Job completed');
@@ -191,7 +204,7 @@ async function start() {
     }
   });
 
-  for (const worker of [embeddingWorker, lintWorker]) {
+  for (const worker of [embeddingWorker, lintWorker, embeddingMigrateWorker]) {
     worker.on('completed', (job) => {
       logger.info({ jobId: job.id, name: job.name }, 'Job completed');
     });
