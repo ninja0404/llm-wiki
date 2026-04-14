@@ -13,6 +13,7 @@ import {
   unsubscribeFromWorkspace,
   initWsSubscriber,
 } from './lib/ws.js';
+import { globalRateLimit, tenantRateLimit, endpointRateLimit, RATE_LIMITS } from './lib/rate-limit.js';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/dist/queueAdapters/bullMQ.js';
 import { HonoAdapter } from '@bull-board/hono';
@@ -123,6 +124,10 @@ app.get(
   }),
 );
 
+// ── Rate limiting ──
+
+app.use('/api/*', globalRateLimit(RATE_LIMITS.global));
+
 // ── Protected routes ──
 
 app.use('/api/*', async (c, next) => {
@@ -137,6 +142,8 @@ app.use('/api/*', async (c, next) => {
   c.set('userId' as never, session.user.id);
   await next();
 });
+
+app.use('/api/*', tenantRateLimit(RATE_LIMITS.tenant));
 
 app.route('/api/me', meRoutes);
 app.route('/api/workspaces', workspaceRoutes);
@@ -162,6 +169,9 @@ workspaceScoped.use('*', async (c, next) => {
 
   await next();
 });
+
+workspaceScoped.use('/sources*', endpointRateLimit(RATE_LIMITS.llmEndpoints));
+workspaceScoped.use('/chat*', endpointRateLimit(RATE_LIMITS.llmEndpoints));
 
 workspaceScoped.route('/sources', sourceRoutes);
 workspaceScoped.route('/sources', sourceRetryRoutes);
