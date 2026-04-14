@@ -313,7 +313,7 @@ export function ChatView() {
                           setCopiedId(msg.id);
                           setTimeout(() => setCopiedId(null), 2000);
                         }}
-                        className="absolute -bottom-6 right-0 hidden items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 group-hover:flex"
+                        className="mt-2 flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600"
                       >
                         {copiedId === msg.id ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
                       </button>
