@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import { validateUrl, fetchUrl, SsrfError } from '../lib/ssrf.js';
 import { uploadFile } from '../lib/storage.js';
+import { parseFile, UnsupportedFileTypeError } from '../ingest/file-parser.js';
 import { splitIntoChunks } from '../ingest/chunker.js';
 import { ingestQueue } from '../jobs/queues.js';
 import { redis } from '../lib/redis.js';
@@ -95,14 +96,29 @@ app.post('/file', async (c) => {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const rawContent = buffer.toString('utf-8');
+  const mimeType = file.type || 'application/octet-stream';
+
+  let rawContent: string;
+  try {
+    rawContent = await parseFile(buffer, mimeType);
+  } catch (err) {
+    if (err instanceof UnsupportedFileTypeError) {
+      return c.json({ error: 'UnsupportedFileType', message: err.message }, 422);
+    }
+    return c.json({ error: 'ParseFailed', message: err instanceof Error ? err.message : 'Failed to parse file' }, 422);
+  }
+
+  if (!rawContent.trim()) {
+    return c.json({ error: 'EmptyContent', message: 'No text content could be extracted from the file' }, 422);
+  }
+
   const contentHash = createHash('sha256').update(rawContent).digest('hex');
 
   const dup = await checkDuplicate(workspaceId, contentHash);
   if (dup) return c.json(dup, 409);
 
   const fileKey = `${workspaceId}/${crypto.randomUUID()}/${file.name}`;
-  await uploadFile(fileKey, buffer, file.type || 'application/octet-stream');
+  await uploadFile(fileKey, buffer, mimeType);
 
   const source = await createSource(workspaceId, {
     title,
