@@ -5,6 +5,7 @@ import { conversations, messages, workspaces } from '../db/schema/index.js';
 import { eq, and } from 'drizzle-orm';
 import { getModel, defaultConfig, type TenantLLMConfig } from '../llm/provider.js';
 import { hybridSearch } from '../search/engine.js';
+import { config } from '../lib/config.js';
 import type { LanguageModelV1 } from 'ai';
 
 const app = new Hono();
@@ -94,7 +95,17 @@ app.post('/conversations/:convId/chat', async (c) => {
   });
   const customPrompt = workspace?.systemPrompt || '';
 
-  const llmConfig: TenantLLMConfig = workspace?.llmProvider
+  const hasWorkspaceKey = !!workspace?.llmApiKeyEncrypted;
+  const hasEnvKey = !!config.openaiApiKey;
+
+  if (!hasWorkspaceKey && !hasEnvKey) {
+    return c.json({
+      error: 'No API Key configured',
+      message: 'Please configure your LLM API Key in Settings → LLM Configuration',
+    }, 422);
+  }
+
+  const llmConfig: TenantLLMConfig = workspace?.llmProvider && hasWorkspaceKey
     ? {
         provider: workspace.llmProvider as 'openai' | 'anthropic' | 'custom',
         model: workspace.llmModel || 'gpt-4o-mini',
