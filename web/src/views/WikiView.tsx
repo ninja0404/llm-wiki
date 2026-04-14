@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import ReactMarkdown from 'react-markdown';
-import { Book, ArrowLeft, ExternalLink, Tag, History, Clock } from 'lucide-react';
+import { Book, ArrowLeft, ExternalLink, Tag, History, Clock, GitCompare } from 'lucide-react';
+import { diffLines, type Change } from 'diff';
 import { useWorkspaceStore } from '@/store/workspace';
 import { useWs } from '@/lib/useWs';
 import { cn } from '@/lib/cn';
@@ -246,7 +247,9 @@ function WikiPageDetail({ slug, workspaceId }: { slug: string; workspaceId?: str
             ) : versions.length === 0 ? (
               <p className="py-8 text-center text-sm text-zinc-500">No version history yet.</p>
             ) : (
-              versions.map((v) => (
+              versions.map((v, idx) => {
+                const nextVersion = idx < versions.length - 1 ? versions[idx + 1] : null;
+                return (
                 <div key={v.id} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -262,16 +265,42 @@ function WikiPageDetail({ slug, workspaceId }: { slug: string; workspaceId?: str
                     </div>
                     <span className="text-xs text-zinc-400">{new Date(v.createdAt).toLocaleString()}</span>
                   </div>
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-zinc-500 hover:text-primary-600">
-                      View snapshot ({v.contentSnapshot.length} chars)
-                    </summary>
-                    <pre className="mt-2 max-h-64 overflow-auto rounded bg-zinc-50 p-3 text-xs dark:bg-zinc-900">
-                      {v.contentSnapshot}
-                    </pre>
-                  </details>
+                  <div className="mt-2 flex gap-2">
+                    <details>
+                      <summary className="cursor-pointer text-xs text-zinc-500 hover:text-primary-600">
+                        View snapshot ({v.contentSnapshot.length} chars)
+                      </summary>
+                      <pre className="mt-2 max-h-64 overflow-auto rounded bg-zinc-50 p-3 text-xs dark:bg-zinc-900">
+                        {v.contentSnapshot}
+                      </pre>
+                    </details>
+                    {nextVersion && (
+                      <details>
+                        <summary className="cursor-pointer text-xs text-zinc-500 hover:text-primary-600 flex items-center gap-1">
+                          <GitCompare className="h-3 w-3" /> Diff
+                        </summary>
+                        <div className="mt-2 max-h-64 overflow-auto rounded bg-zinc-50 p-3 text-xs font-mono dark:bg-zinc-900">
+                          {diffLines(nextVersion.contentSnapshot, v.contentSnapshot).map((part: Change, i: number) => (
+                            <div
+                              key={i}
+                              className={
+                                part.added ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                part.removed ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                                'text-zinc-600 dark:text-zinc-400'
+                              }
+                            >
+                              {part.value.split('\n').filter(Boolean).map((line: string, j: number) => (
+                                <div key={j}>{part.added ? '+' : part.removed ? '-' : ' '} {line}</div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         ) : (

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../lib/db.js';
-import { sources, workspaces } from '../db/schema/index.js';
-import { eq, and } from 'drizzle-orm';
+import { sources, workspaces, wikiPageChunks, sourceChunks, wikiPages, activityLogs } from '../db/schema/index.js';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import { validateUrl, fetchUrl, SsrfError } from '../lib/ssrf.js';
 import { uploadFile } from '../lib/storage.js';
@@ -139,6 +139,51 @@ app.get('/:id', async (c) => {
 
   if (!source) return c.json({ error: 'Not found' }, 404);
   return c.json({ data: source });
+});
+
+app.delete('/:id', async (c) => {
+  const workspaceId = c.req.param('workspaceId')!;
+  const id = c.req.param('id')!;
+
+  const source = await db.query.sources.findFirst({
+    where: and(eq(sources.id, id), eq(sources.workspaceId, workspaceId)),
+  });
+  if (!source) return c.json({ error: 'Not found' }, 404);
+
+  const chunks = await db.query.sourceChunks.findMany({
+    where: eq(sourceChunks.sourceId, id),
+    columns: { id: true },
+  });
+  const chunkIds = chunks.map((c) => c.id);
+
+  let affectedPageIds: string[] = [];
+  if (chunkIds.length > 0) {
+    const pageChunks = await db
+      .selectDistinct({ wikiPageId: wikiPageChunks.wikiPageId })
+      .from(wikiPageChunks)
+      .where(inArray(wikiPageChunks.sourceChunkId, chunkIds));
+
+    affectedPageIds = pageChunks.map((r) => r.wikiPageId);
+
+    if (affectedPageIds.length > 0) {
+      await db
+        .update(wikiPages)
+        .set({ status: 'flagged', updatedAt: new Date() })
+        .where(inArray(wikiPages.id, affectedPageIds));
+    }
+  }
+
+  await db.delete(sources).where(eq(sources.id, id));
+
+  await db.insert(activityLogs).values({
+    workspaceId,
+    action: 'source_revoked',
+    entityType: 'source',
+    entityId: id,
+    details: { title: source.title, affectedPages: affectedPageIds.length },
+  });
+
+  return c.json({ data: { deleted: true, affectedPages: affectedPageIds.length } });
 });
 
 async function checkDuplicate(workspaceId: string, contentHash: string) {
