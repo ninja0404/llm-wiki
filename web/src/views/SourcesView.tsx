@@ -13,6 +13,11 @@ import {
 import { useWorkspaceStore } from '@/store/workspace';
 import { useWs } from '@/lib/useWs';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import type { WsMessage } from '@llm-wiki/shared';
 
 interface Source {
@@ -191,19 +196,13 @@ export function SourcesView() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Sources</h1>
         <div className="flex gap-2">
-          <button
-            onClick={loadSources}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50"
-          >
+          <Button variant="outline" size="icon" onClick={loadSources}>
             <RefreshCw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
+          </Button>
+          <Button onClick={() => setShowForm(true)}>
             <Upload className="h-4 w-4" />
             Add Source
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -261,21 +260,17 @@ export function SourcesView() {
             {error && <p className="text-sm text-red-500">{error}</p>}
 
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-              >
+              <Button type="submit" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                 Submit
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => { setShowForm(false); setError(''); }}
-                className="rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -319,7 +314,9 @@ export function SourcesView() {
                 </div>
                 <div className="flex items-center gap-2">
                   {(source.status === 'partial_failure' || source.status === 'failed') && (
-                    <button
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={async () => {
                         if (!currentWorkspace) return;
                         await fetch(`/api/workspaces/${currentWorkspace.id}/sources/${source.id}/retry`, {
@@ -328,10 +325,10 @@ export function SourcesView() {
                         });
                         loadSources();
                       }}
-                      className="rounded border border-amber-300 px-2 py-0.5 text-xs text-amber-600 hover:bg-amber-50"
+                      className="text-amber-600 border-amber-300 hover:bg-amber-50"
                     >
                       Retry
-                    </button>
+                    </Button>
                   )}
                   <div className={cn('flex items-center gap-1.5 text-xs font-medium', cfg.color)}>
                     <StatusIcon className={cn('h-4 w-4', source.status === 'processing' && 'animate-spin')} />
