@@ -118,8 +118,13 @@ app.post('/file', async (c) => {
   const dup = await checkDuplicate(workspaceId, contentHash);
   if (dup) return c.json(dup, 409);
 
-  const fileKey = `${workspaceId}/${crypto.randomUUID()}/${file.name}`;
-  await uploadFile(fileKey, buffer, mimeType);
+  let fileKey: string | undefined;
+  try {
+    fileKey = `${workspaceId}/${crypto.randomUUID()}/${file.name}`;
+    await uploadFile(fileKey, buffer, mimeType);
+  } catch {
+    fileKey = undefined;
+  }
 
   const source = await createSource(workspaceId, {
     title,
