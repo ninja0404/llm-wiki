@@ -58,12 +58,19 @@ async function vectorSearch(
   const results = await db.execute(sql`
     SELECT
       id, title, slug, summary, page_type,
-      1 - (embedding <=> ${vectorStr}::vector) as similarity
+      CASE
+        WHEN embedding_v2 IS NOT NULL THEN 1 - (embedding_v2 <=> ${vectorStr}::vector)
+        ELSE 1 - (embedding <=> ${vectorStr}::vector)
+      END as similarity
     FROM wiki_pages
     WHERE workspace_id = ${workspaceId}
       AND deleted_at IS NULL
-      AND embedding IS NOT NULL
-    ORDER BY embedding <=> ${vectorStr}::vector
+      AND (embedding IS NOT NULL OR embedding_v2 IS NOT NULL)
+    ORDER BY
+      CASE
+        WHEN embedding_v2 IS NOT NULL THEN embedding_v2 <=> ${vectorStr}::vector
+        ELSE embedding <=> ${vectorStr}::vector
+      END
     LIMIT ${limit}
   `);
 

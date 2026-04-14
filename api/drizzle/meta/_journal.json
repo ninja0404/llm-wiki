@@ -15,6 +15,13 @@
       "when": 1776135835087,
       "tag": "0001_add_search_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776137080581,
+      "tag": "0002_embedding_migration_support",
+      "breakpoints": true
     }
   ]
 }
