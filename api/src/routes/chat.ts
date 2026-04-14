@@ -31,6 +31,12 @@ app.post('/conversations', async (c) => {
   return c.json({ data: conv }, 201);
 });
 
+app.delete('/conversations/:convId', async (c) => {
+  const convId = c.req.param('convId')!;
+  await db.delete(conversations).where(eq(conversations.id, convId));
+  return c.json({ data: { deleted: true } });
+});
+
 app.get('/conversations/:convId/messages', async (c) => {
   const convId = c.req.param('convId')!;
   const result = await db.query.messages.findMany({

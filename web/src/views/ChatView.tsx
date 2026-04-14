@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Send, MessageSquare, Plus, Loader2, BookPlus } from 'lucide-react';
+import { Send, MessageSquare, Plus, Loader2, BookPlus, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useWorkspaceStore } from '@/store/workspace';
 import { cn } from '@/lib/cn';
@@ -178,18 +178,37 @@ export function ChatView() {
         </div>
         <div className="flex-1 overflow-auto p-2">
           {conversations.map((conv) => (
-            <button
+            <div
               key={conv.id}
-              onClick={() => setCurrentConvId(conv.id)}
               className={cn(
-                'mb-1 w-full truncate rounded-lg px-3 py-2 text-left text-sm',
+                'group mb-1 flex items-center rounded-lg',
                 currentConvId === conv.id
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-zinc-600 hover:bg-zinc-100',
               )}
             >
-              {conv.title || 'Untitled'}
-            </button>
+              <button
+                onClick={() => setCurrentConvId(conv.id)}
+                className="min-w-0 flex-1 truncate px-3 py-2 text-left text-sm"
+              >
+                {conv.title || 'Untitled'}
+              </button>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!currentWorkspace) return;
+                  await fetch(`/api/workspaces/${currentWorkspace.id}/chat/conversations/${conv.id}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                  });
+                  setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+                  if (currentConvId === conv.id) setCurrentConvId(null);
+                }}
+                className="hidden p-1 text-zinc-400 hover:text-red-500 group-hover:block"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ))}
         </div>
       </div>
