@@ -306,19 +306,21 @@ export function ChatView() {
                     ) : (
                       msg.content
                     )}
-                    {msg.role === 'assistant' && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(msg.content);
-                          setCopiedId(msg.id);
-                          setTimeout(() => setCopiedId(null), 2000);
-                        }}
-                        className="mt-2 flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600"
-                      >
-                        {copiedId === msg.id ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
-                      </button>
-                    )}
                     </div>
+                    {msg.role === 'assistant' && (
+                      <div className="mt-1 flex justify-end">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content);
+                            setCopiedId(msg.id);
+                            setTimeout(() => setCopiedId(null), 2000);
+                          }}
+                          className="hidden items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 group-hover:flex"
+                        >
+                          {copiedId === msg.id ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
