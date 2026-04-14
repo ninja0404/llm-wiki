@@ -1,120 +1,98 @@
 ---
-milestone: "Phase 0 Completion"
-version: "0.1.0"
+milestone: "v0.2.0 Productization"
+version: "0.2.0"
 ---
 
-# Roadmap: LLM Wiki Phase 0 Completion
+# Roadmap: LLM Wiki v0.2.0 — Productization
 
-## Milestone: Phase 0 Completion (v0.1.0)
+## Milestone: v0.2.0 Productization
 
-### Phase 1: Database Indexes & Search Hardening
+### Phase 1: File Parsing (PDF/DOCX/HTML)
 
-**Goal:** 补全关键数据库索引，确保搜索性能达到 SLA 要求
+**Goal:** 扩展文件上传支持，用户可上传 PDF/DOCX/HTML 文件自动提取文本
 
-**Requirements:** DB-01, DB-02, DB-03, DB-04, SRCH-01, SRCH-02
+**Requirements:** FILE-01, FILE-02, FILE-03
 
 **Success criteria:**
-1. HNSW 向量索引在 wiki_pages.embedding 和 source_chunks.embedding 上创建成功
-2. GIN tsvector 索引和 trigram 索引创建成功
-3. 搜索在 embedding IS NULL 时降级为纯 FTS 不报错
-4. Drizzle 迁移文件生成并可通过 db:migrate 应用
+1. PDF 文件上传后内容正确提取并进入 Ingest Pipeline
+2. DOCX 文件上传后内容正确提取
+3. HTML 文件上传后去标签提取正文
 
 **UI hint:** no
 
 ---
 
-### Phase 2: Lint Worker Implementation
+### Phase 2: Multi-Provider LLM + Fallback
 
-**Goal:** 实现 Wiki 内容健康检查 Worker，自动检测质量问题
+**Goal:** 支持多 LLM Provider 配置和自动 Fallback
 
-**Requirements:** LINT-01, LINT-02, LINT-03
-
-**Depends on:** Phase 1 (需要索引就位)
+**Requirements:** MPROV-01, MPROV-02, MPROV-03
 
 **Success criteria:**
-1. Lint Worker 检测到无入链的孤立页面并记录 activity_log
-2. Lint Worker 检测到指向不存在 slug 的断裂链接
-3. Lint 结果通过 WebSocket 推送到前端
-
-**UI hint:** no
-
----
-
-### Phase 3: MinIO File Upload Integration
-
-**Goal:** 完成文件类型 Source 的完整上传/下载/Ingest 链路
-
-**Requirements:** FILE-01, FILE-02
-
-**Success criteria:**
-1. 用户可在 Sources 页面上传文件到 MinIO
-2. 文件类型的 Source 能从 MinIO 读取内容并触发 Ingest Pipeline
-3. 上传的文件 key 正确存储在 sources.file_key 字段
+1. 管理员可配置 OpenAI/Anthropic/Custom 多个 Provider
+2. 主 Provider 熔断后自动切换到备用 Provider
+3. 租户可自带 API Key 并选择偏好 Provider
 
 **UI hint:** yes
 
 ---
 
-### Phase 4: Production Configuration & Health Check
+### Phase 3: API Rate Limiting
 
-**Goal:** 消除所有硬编码配置，增强健康检查，为部署做准备
+**Goal:** 实现多层 API 速率限制，防止滥用
 
-**Requirements:** PROD-01, PROD-02, PROD-03, PROD-04, HLTH-01, HLTH-02, HLTH-03
+**Requirements:** RATE-01, RATE-02, RATE-03
 
 **Success criteria:**
-1. CORS origin、auth baseURL、trustedOrigins 全部通过环境变量配置
-2. 生产环境启动时自动校验加密密钥和 auth secret 非默认值
-3. /health 端点返回 DB + Redis 连接状态和 Worker 存活状态
-4. 所有配置项在 .env.example 中有说明
+1. 全局速率限制生效 (Redis 滑动窗口)
+2. 租户级限制独立计数
+3. LLM 相关端点有更严格的限制
 
 **UI hint:** no
 
 ---
 
-### Phase 5: Docker Containerization
+### Phase 4: Version Diff + Source Revocation
 
-**Goal:** 创建所有服务的 Dockerfile 和生产 docker-compose 配置
+**Goal:** Wiki 版本 diff 查看和 Source 撤销功能
 
-**Requirements:** DEPL-01, DEPL-02, DEPL-03, DEPL-04
-
-**Depends on:** Phase 4 (需要环境变量化完成)
+**Requirements:** DIFF-01, REVK-01, REVK-02
 
 **Success criteria:**
-1. API Dockerfile 使用 multi-stage build，镜像 < 200MB
-2. Worker Dockerfile 复用 API 基础镜像
-3. Web Dockerfile 使用 Nginx 托管 Vite build 产物
-4. docker-compose.prod.yml 一键启动所有服务且全部健康
-
-**UI hint:** no
-
----
-
-### Phase 6: Frontend Polish
-
-**Goal:** 引入 shadcn/ui 组件系统，增加版本历史和重试功能
-
-**Requirements:** FE-01, FE-02, FE-03
-
-**Depends on:** Phase 2 (Lint 结果需要在 UI 展示)
-
-**Success criteria:**
-1. shadcn/ui 核心组件 (Button, Card, Dialog, Input, Table) 替换原始 Tailwind
-2. Wiki 页面有版本历史 tab，显示变更记录和 content diff
-3. Sources 页面失败批次显示重试按钮且可用
+1. 可查看两个版本之间的 content diff
+2. 删除 Source 时关联页面标记为 flagged
+3. Flagged 队列 UI 可操作 (确认/编辑/删除)
 
 **UI hint:** yes
 
 ---
 
-### Phase 7: Pipeline Improvements
+### Phase 5: Redis Caching Layer
 
-**Goal:** 补齐 Pipeline 的串行保证和 Chat 自定义 prompt
+**Goal:** 引入 Redis 缓存层优化读性能
 
-**Requirements:** PIPE-01, PIPE-02
+**Requirements:** CACHE-01, CACHE-02, CACHE-03
 
 **Success criteria:**
-1. 同一 Source 的 extract-batch jobs 按 batchIndex 顺序执行
-2. Chat RAG 使用 workspace.systemPrompt 作为 system message 的一部分
-3. 后续批次能正确看到前面批次创建的 Wiki 页面
+1. Wiki 页面详情有 Redis 缓存 (TTL + write-through)
+2. 查询结果缓存命中率 > 0 (相同问题重复查询)
+3. Redis 不可用时自动降级为直接查询
+
+**UI hint:** no
+
+---
+
+### Phase 6: Embedding Model Migration
+
+**Goal:** 支持 Embedding 模型平滑迁移
+
+**Requirements:** EMB-01, EMB-02, EMB-03
+
+**Depends on:** Phase 5 (缓存层需先就位)
+
+**Success criteria:**
+1. 新增 embedding_v2 列不影响现有搜索
+2. 后台任务异步重算旧数据 embedding
+3. 搜索自动使用新列，标注未迁移状态
 
 **UI hint:** no

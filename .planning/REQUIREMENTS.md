@@ -1,136 +1,104 @@
-# Requirements: LLM Wiki Phase 0 Completion
+# Requirements: LLM Wiki v0.2.0 — Productization
 
 **Defined:** 2026-04-14
 **Core Value:** 用户上传资料后，LLM 自动构建高质量、互相链接的 Wiki 知识库
 
 ## v1 Requirements
 
-### Database
+### File Parsing
 
-- [ ] **DB-01**: PostgreSQL 创建 HNSW 向量索引用于 wiki_pages 和 source_chunks 的 embedding 列
-- [ ] **DB-02**: PostgreSQL 创建 GIN 索引用于 wiki_pages 全文搜索 (tsvector)
-- [ ] **DB-03**: PostgreSQL 创建 GIN trigram 索引用于 wiki_pages.title 的模糊匹配
-- [ ] **DB-04**: Drizzle 迁移文件生成并可正常 apply (从 db:push 切换到 db:migrate)
-
-### Search
-
-- [ ] **SRCH-01**: 搜索引擎在 embedding IS NULL 时降级为纯 FTS 搜索不报错
-- [ ] **SRCH-02**: 搜索 P95 延迟 < 500ms (1000 条 wiki 页面规模)
-
-### Lint System
-
-- [ ] **LINT-01**: Lint Worker 能检测孤立页面 (无入链的非根页面)
-- [ ] **LINT-02**: Lint Worker 能检测断裂链接 ([[slug]] 目标不存在)
-- [ ] **LINT-03**: Lint Worker 运行结果写入 activity_logs 并通过 WebSocket 推送
-
-### File Upload
-
-- [ ] **FILE-01**: 用户可上传文件作为 Source (MinIO SDK 集成)
-- [ ] **FILE-02**: 文件类型的 Source 能正确读取 MinIO 中的内容进行 Ingest
-
-### Production Config
-
-- [ ] **PROD-01**: CORS origin 通过环境变量配置而非硬编码
-- [ ] **PROD-02**: better-auth baseURL 和 trustedOrigins 通过环境变量配置
-- [ ] **PROD-03**: 启动时校验 ENCRYPTION_KEY 非默认值 (生产环境)
-- [ ] **PROD-04**: 启动时校验 BETTER_AUTH_SECRET 非默认值 (生产环境)
-
-### Deployment
-
-- [ ] **DEPL-01**: API 服务 Dockerfile (multi-stage build, < 200MB)
-- [ ] **DEPL-02**: Worker 服务 Dockerfile (复用 API 基础镜像)
-- [ ] **DEPL-03**: Web 前端 Dockerfile (Nginx 托管静态文件)
-- [ ] **DEPL-04**: docker-compose.prod.yml 包含所有服务 (postgres + redis + minio + api + worker + web)
-
-### Frontend
-
-- [ ] **FE-01**: 引入 shadcn/ui 组件系统替换原始 Tailwind 组件
-- [ ] **FE-02**: Wiki 页面版本历史查看 UI (版本列表 + content diff)
-- [ ] **FE-03**: Source 失败批次重试按钮可用
-
-### Pipeline
-
-- [ ] **PIPE-01**: 同一 Source 的 extract-batch 按 batchIndex 顺序串行执行
-- [ ] **PIPE-02**: Workspace systemPrompt 在 Chat RAG 上下文中生效
-
-### Health
-
-- [ ] **HLTH-01**: /health 端点验证 PostgreSQL 连接可用
-- [ ] **HLTH-02**: /health 端点验证 Redis 连接可用
-- [ ] **HLTH-03**: /health 返回 Worker 进程存活状态
-
-## v2 Requirements
+- [ ] **FILE-01**: 用户上传 PDF 文件后系统自动提取文本内容进入 Ingest Pipeline
+- [ ] **FILE-02**: 用户上传 DOCX 文件后系统自动提取文本内容进入 Ingest Pipeline
+- [ ] **FILE-03**: 用户上传 HTML 文件后系统自动提取正文内容 (去除标签)
 
 ### Multi-Provider
 
-- **MPROV-01**: 支持 Anthropic Claude 作为 LLM Provider
-- **MPROV-02**: 主 Provider 熔断后自动 Fallback 到备用 Provider
+- [ ] **MPROV-01**: 管理员可配置多个 LLM Provider (OpenAI/Anthropic/Custom)
+- [ ] **MPROV-02**: 主 Provider 熔断后自动 Fallback 到备用 Provider
+- [ ] **MPROV-03**: 租户可自带 API Key 并选择 Provider
+
+### Rate Limiting
+
+- [ ] **RATE-01**: API 全局请求速率限制 (Redis 滑动窗口)
+- [ ] **RATE-02**: 租户级 API 调用限制 (per-organization)
+- [ ] **RATE-03**: 端点级限制 (LLM 相关端点更严格)
+
+### Version Diff
+
+- [ ] **DIFF-01**: Wiki 页面版本列表可查看两个版本之间的 content diff
+
+### Source Revocation
+
+- [ ] **REVK-01**: 删除 Source 时，关联的 Wiki 页面标记为 flagged
+- [ ] **REVK-02**: 前端 Flagged 队列展示受影响页面及操作选项 (确认/编辑/删除)
 
 ### Caching
 
-- **CACHE-01**: 查询结果 Redis 缓存 (hash(question + wiki_version) → answer)
-- **CACHE-02**: Wiki 页面 Redis 读缓存 (write-through 失效)
+- [ ] **CACHE-01**: Wiki 页面详情 Redis 缓存 (TTL + write-through 失效)
+- [ ] **CACHE-02**: 查询结果 Redis 缓存 (hash(question + wiki_version) → answer, TTL 1h)
+- [ ] **CACHE-03**: Redis 不可用时降级为直接查询 (cache-aside)
+
+### Embedding Migration
+
+- [ ] **EMB-01**: 支持新增 embedding_v2 列 (不同维度/模型)
+- [ ] **EMB-02**: 后台任务异步用新模型重算旧数据的 embedding
+- [ ] **EMB-03**: 搜索自动使用新列 (已迁移数据) + 标注未迁移数据
+
+## v2 Requirements
 
 ### Observability
 
 - **OBS-01**: OpenTelemetry 替代自建 trace_id
-- **OBS-02**: Prometheus metrics 导出
+- **OBS-02**: Prometheus metrics 导出 (请求延迟、队列深度、Token 消耗率)
 
-### Data
+### Data Partitioning
 
-- **DATA-01**: activity_logs 和 llm_invocations 按月分区
-- **DATA-02**: Embedding 模型迁移工具 (双列方案)
+- **PART-01**: activity_logs 按月分区
+- **PART-02**: llm_invocations 按月分区
+
+### Data Compliance
+
+- **GDPR-01**: Workspace 数据导出 (GDPR Article 20)
+- **GDPR-02**: 数据保留策略配置
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
 | SSO/SAML | Phase 2 — 需验证 better-auth 支持度 |
-| 开放 API + API Key 管理 | Phase 2 — 非核心功能 |
-| 私有化 Helm Chart | Phase 2 — 先验证 docker compose 部署 |
+| 开放 API + API Key 管理 | Phase 2 — 非核心 |
+| Helm Chart | Phase 2 — 先验证 docker compose |
 | 计费系统 | Phase 2 — 先做内部使用 |
-| 团队协作 (评论/审批流) | Phase 2 — 先完善单人体验 |
-| 测试基础设施 (Vitest) | 暂缓 — 聚焦功能补齐 |
-| Query 缓存 | v2 — 非阻塞性需求 |
-| PDF/DOCX 解析 | Phase 1 — 先支持文本/URL/文件上传 |
+| 全局知识图谱 (WebGL) | Phase 2 — ego graph 够用 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DB-01 | Phase 1 | Pending |
-| DB-02 | Phase 1 | Pending |
-| DB-03 | Phase 1 | Pending |
-| DB-04 | Phase 1 | Pending |
-| SRCH-01 | Phase 1 | Pending |
-| SRCH-02 | Phase 1 | Pending |
-| LINT-01 | Phase 2 | Pending |
-| LINT-02 | Phase 2 | Pending |
-| LINT-03 | Phase 2 | Pending |
-| FILE-01 | Phase 3 | Pending |
-| FILE-02 | Phase 3 | Pending |
-| PROD-01 | Phase 4 | Pending |
-| PROD-02 | Phase 4 | Pending |
-| PROD-03 | Phase 4 | Pending |
-| PROD-04 | Phase 4 | Pending |
-| DEPL-01 | Phase 5 | Pending |
-| DEPL-02 | Phase 5 | Pending |
-| DEPL-03 | Phase 5 | Pending |
-| DEPL-04 | Phase 5 | Pending |
-| FE-01 | Phase 6 | Pending |
-| FE-02 | Phase 6 | Pending |
-| FE-03 | Phase 6 | Pending |
-| PIPE-01 | Phase 7 | Pending |
-| PIPE-02 | Phase 7 | Pending |
-| HLTH-01 | Phase 4 | Pending |
-| HLTH-02 | Phase 4 | Pending |
-| HLTH-03 | Phase 4 | Pending |
+| FILE-01 | Phase 1 | Pending |
+| FILE-02 | Phase 1 | Pending |
+| FILE-03 | Phase 1 | Pending |
+| MPROV-01 | Phase 2 | Pending |
+| MPROV-02 | Phase 2 | Pending |
+| MPROV-03 | Phase 2 | Pending |
+| RATE-01 | Phase 3 | Pending |
+| RATE-02 | Phase 3 | Pending |
+| RATE-03 | Phase 3 | Pending |
+| DIFF-01 | Phase 4 | Pending |
+| REVK-01 | Phase 4 | Pending |
+| REVK-02 | Phase 4 | Pending |
+| CACHE-01 | Phase 5 | Pending |
+| CACHE-02 | Phase 5 | Pending |
+| CACHE-03 | Phase 5 | Pending |
+| EMB-01 | Phase 6 | Pending |
+| EMB-02 | Phase 6 | Pending |
+| EMB-03 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 27 total
-- Mapped to phases: 27
+- v1 requirements: 18 total
+- Mapped to phases: 18
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after initial definition*
+*Last updated: 2026-04-14 after v0.2.0 milestone start*
