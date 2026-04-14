@@ -195,6 +195,9 @@ workspaceScoped.route('/chat', chatRoutes);
 workspaceScoped.route('/flagged', flaggedRoutes);
 workspaceScoped.route('/lint', lintRoutes);
 
+import exportRoutes from './routes/export.js';
+workspaceScoped.route('/export', exportRoutes);
+
 app.route('/api/workspaces/:workspaceId', workspaceScoped);
 
 // ── Start ──
