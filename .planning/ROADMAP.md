@@ -46,3 +46,20 @@ version: "0.3.0"
 **Goal:** OpenTelemetry + Prometheus + Grafana
 **Requirements:** OBS-01, OBS-02, OBS-03
 **UI hint:** no
+
+---
+
+### Phase 9: Gap Closure — v0.1.0/v0.2.0 Production Readiness
+
+**Goal:** 补全 v0.1.0 和 v0.2.0 中的高优先级缺失，使其达到生产可用
+
+**Requirements:** GAP-01, GAP-02, GAP-03, GAP-04, GAP-05
+
+**Success criteria:**
+1. SourcesView 前端支持文件拖拽上传
+2. Wiki 页面更新时 Redis 缓存正确失效
+3. Embedding 迁移 Job 注册到 Worker 并可执行
+4. Workspace LLM 配置 CRUD API 可用
+5. Lint Worker 有 cron 定时执行配置
+
+**UI hint:** yes
