@@ -3,6 +3,7 @@ import { db } from '../lib/db.js';
 import { subscriptions, PLAN_LIMITS } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { logger } from '../lib/logger.js';
+import { stripe, STRIPE_WEBHOOK_SECRET, PRICE_IDS } from '../lib/stripe.js';
 
 const app = new Hono();
 
@@ -52,17 +53,37 @@ app.post('/subscription/upgrade', async (c) => {
   return c.json({ data: { upgraded: true, plan: body.plan } });
 });
 
+app.post('/checkout', async (c) => {
+  if (!stripe) return c.json({ error: 'Stripe not configured' }, 503);
+
+  const body = await c.req.json<{ organizationId: string; plan: 'pro' | 'enterprise' }>();
+  const priceId = PRICE_IDS[body.plan];
+  if (!priceId) return c.json({ error: 'Invalid plan' }, 400);
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${process.env.BASE_URL || 'http://localhost:5173'}/settings?billing=success`,
+    cancel_url: `${process.env.BASE_URL || 'http://localhost:5173'}/settings?billing=canceled`,
+    metadata: { organizationId: body.organizationId, plan: body.plan },
+  });
+
+  return c.json({ data: { checkoutUrl: session.url } });
+});
+
 app.post('/webhook', async (c) => {
   const signature = c.req.header('stripe-signature');
   if (!signature) return c.json({ error: 'Missing signature' }, 400);
 
   const rawBody = await c.req.text();
 
-  // TODO: verify signature with Stripe webhook secret
-  // const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-
+  let event: { type: string; data: { object: Record<string, unknown> } };
   try {
-    const event = JSON.parse(rawBody) as { type: string; data: { object: Record<string, unknown> } };
+    if (stripe && STRIPE_WEBHOOK_SECRET) {
+      event = stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET) as unknown as typeof event;
+    } else {
+      event = JSON.parse(rawBody);
+    }
 
     switch (event.type) {
       case 'checkout.session.completed': {
