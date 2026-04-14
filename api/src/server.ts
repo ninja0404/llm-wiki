@@ -35,6 +35,7 @@ import chatRoutes from './routes/chat.js';
 import flaggedRoutes from './routes/flagged.js';
 import lintRoutes from './routes/lint.js';
 import apiKeysRoutes from './routes/api-keys.js';
+import ssoRoutes from './routes/sso.js';
 import { apiReference } from '@scalar/hono-api-reference';
 
 const app = new Hono();
@@ -149,6 +150,7 @@ app.use('/api/*', tenantRateLimit(RATE_LIMITS.tenant));
 
 app.route('/api/me', meRoutes);
 app.route('/api/api-keys', apiKeysRoutes);
+app.route('/api/sso', ssoRoutes);
 
 app.get('/docs', apiReference({
   theme: 'default',
