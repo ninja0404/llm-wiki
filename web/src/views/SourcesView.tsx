@@ -41,7 +41,8 @@ export function SourcesView() {
   const { currentWorkspace } = useWorkspaceStore();
   const [sources, setSources] = useState<Source[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [sourceType, setSourceType] = useState<'text' | 'url'>('text');
+  const [sourceType, setSourceType] = useState<'text' | 'url' | 'file'>('text');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -147,19 +148,33 @@ export function SourcesView() {
     setLoading(true);
     setError('');
 
-    const endpoint = sourceType === 'text' ? 'text' : 'url';
-    const body =
-      sourceType === 'text'
-        ? { title, content }
-        : { title, url: content };
-
     try {
-      const res = await fetch(`/api/workspaces/${currentWorkspace.id}/sources/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
+      let res: Response;
+
+      if (sourceType === 'file') {
+        if (!selectedFile) {
+          setError('Please select a file');
+          setLoading(false);
+          return;
+        }
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('title', title);
+        res = await fetch(`/api/workspaces/${currentWorkspace.id}/sources/file`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+      } else {
+        const endpoint = sourceType === 'text' ? 'text' : 'url';
+        const body = sourceType === 'text' ? { title, content } : { title, url: content };
+        res = await fetch(`/api/workspaces/${currentWorkspace.id}/sources/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+      }
 
       if (res.status === 409) {
         setError('This content has already been uploaded.');
@@ -173,6 +188,7 @@ export function SourcesView() {
 
       setTitle('');
       setContent('');
+      setSelectedFile(null);
       setShowForm(false);
       await loadSources();
     } catch {
@@ -227,6 +243,15 @@ export function SourcesView() {
             >
               <LinkIcon className="h-4 w-4" /> URL
             </button>
+            <button
+              onClick={() => setSourceType('file')}
+              className={cn(
+                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm',
+                sourceType === 'file' ? 'bg-primary-50 text-primary-700' : 'text-zinc-600 hover:bg-zinc-100',
+              )}
+            >
+              <Upload className="h-4 w-4" /> File
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -246,7 +271,7 @@ export function SourcesView() {
                 className="min-h-[200px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-zinc-700 dark:bg-zinc-800"
                 required
               />
-            ) : (
+            ) : sourceType === 'url' ? (
               <input
                 type="url"
                 placeholder="https://..."
@@ -255,6 +280,25 @@ export function SourcesView() {
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-zinc-700 dark:bg-zinc-800"
                 required
               />
+            ) : (
+              <div className="rounded-lg border-2 border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.html,.htm,.txt,.md"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setSelectedFile(file);
+                      if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
+                    }
+                  }}
+                  className="mb-2"
+                />
+                <p className="text-xs text-zinc-500">Supported: PDF, DOCX, HTML, TXT, Markdown (max 10MB)</p>
+                {selectedFile && (
+                  <p className="mt-2 text-sm text-primary-600">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+                )}
+              </div>
             )}
 
             {error && <p className="text-sm text-red-500">{error}</p>}
