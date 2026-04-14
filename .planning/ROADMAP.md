@@ -1,98 +1,48 @@
 ---
-milestone: "v0.2.0 Productization"
-version: "0.2.0"
+milestone: "v0.3.0 Enterprise"
+version: "0.3.0"
 ---
 
-# Roadmap: LLM Wiki v0.2.0 — Productization
+# Roadmap: LLM Wiki v0.3.0 — Enterprise
 
-## Milestone: v0.2.0 Productization
+## Milestone: v0.3.0 Enterprise
 
-### Phase 1: File Parsing (PDF/DOCX/HTML)
-
-**Goal:** 扩展文件上传支持，用户可上传 PDF/DOCX/HTML 文件自动提取文本
-
-**Requirements:** FILE-01, FILE-02, FILE-03
-
-**Success criteria:**
-1. PDF 文件上传后内容正确提取并进入 Ingest Pipeline
-2. DOCX 文件上传后内容正确提取
-3. HTML 文件上传后去标签提取正文
-
-**UI hint:** no
-
----
-
-### Phase 2: Multi-Provider LLM + Fallback
-
-**Goal:** 支持多 LLM Provider 配置和自动 Fallback
-
-**Requirements:** MPROV-01, MPROV-02, MPROV-03
-
-**Success criteria:**
-1. 管理员可配置 OpenAI/Anthropic/Custom 多个 Provider
-2. 主 Provider 熔断后自动切换到备用 Provider
-3. 租户可自带 API Key 并选择偏好 Provider
-
+### Phase 1: Open API + API Key Management
+**Goal:** 开放 API 体系，支持 API Key 管理和 Scalar 文档
+**Requirements:** API-01, API-02, API-03
 **UI hint:** yes
 
----
-
-### Phase 3: API Rate Limiting
-
-**Goal:** 实现多层 API 速率限制，防止滥用
-
-**Requirements:** RATE-01, RATE-02, RATE-03
-
-**Success criteria:**
-1. 全局速率限制生效 (Redis 滑动窗口)
-2. 租户级限制独立计数
-3. LLM 相关端点有更严格的限制
-
-**UI hint:** no
-
----
-
-### Phase 4: Version Diff + Source Revocation
-
-**Goal:** Wiki 版本 diff 查看和 Source 撤销功能
-
-**Requirements:** DIFF-01, REVK-01, REVK-02
-
-**Success criteria:**
-1. 可查看两个版本之间的 content diff
-2. 删除 Source 时关联页面标记为 flagged
-3. Flagged 队列 UI 可操作 (确认/编辑/删除)
-
+### Phase 2: SSO/SAML Authentication
+**Goal:** 企业级 SSO 登录支持
+**Requirements:** SSO-01, SSO-02
 **UI hint:** yes
 
----
+### Phase 3: Global Knowledge Graph (WebGL)
+**Goal:** 全局知识图谱 WebGL 渲染，支持 1000+ 节点
+**Requirements:** GRAPH-01, GRAPH-02
+**UI hint:** yes
 
-### Phase 5: Redis Caching Layer
-
-**Goal:** 引入 Redis 缓存层优化读性能
-
-**Requirements:** CACHE-01, CACHE-02, CACHE-03
-
-**Success criteria:**
-1. Wiki 页面详情有 Redis 缓存 (TTL + write-through)
-2. 查询结果缓存命中率 > 0 (相同问题重复查询)
-3. Redis 不可用时自动降级为直接查询
-
+### Phase 4: Helm Chart Deployment
+**Goal:** Kubernetes 部署包
+**Requirements:** HELM-01, HELM-02
 **UI hint:** no
 
----
+### Phase 5: Billing System
+**Goal:** 订阅 + 用量计费 + Stripe 集成
+**Requirements:** BILL-01, BILL-02, BILL-03
+**UI hint:** yes
 
-### Phase 6: Embedding Model Migration
+### Phase 6: Export (PDF/Markdown)
+**Goal:** Wiki 内容导出功能
+**Requirements:** EXPT-01, EXPT-02
+**UI hint:** yes
 
-**Goal:** 支持 Embedding 模型平滑迁移
+### Phase 7: Team Collaboration
+**Goal:** 评论 + @提及 + 审批流
+**Requirements:** COLLAB-01, COLLAB-02, COLLAB-03
+**UI hint:** yes
 
-**Requirements:** EMB-01, EMB-02, EMB-03
-
-**Depends on:** Phase 5 (缓存层需先就位)
-
-**Success criteria:**
-1. 新增 embedding_v2 列不影响现有搜索
-2. 后台任务异步重算旧数据 embedding
-3. 搜索自动使用新列，标注未迁移状态
-
+### Phase 8: Observability
+**Goal:** OpenTelemetry + Prometheus + Grafana
+**Requirements:** OBS-01, OBS-02, OBS-03
 **UI hint:** no

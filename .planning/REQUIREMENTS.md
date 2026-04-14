@@ -1,104 +1,91 @@
-# Requirements: LLM Wiki v0.2.0 — Productization
+# Requirements: LLM Wiki v0.3.0 — Enterprise
 
 **Defined:** 2026-04-14
 **Core Value:** 用户上传资料后，LLM 自动构建高质量、互相链接的 Wiki 知识库
 
 ## v1 Requirements
 
-### File Parsing
+### Open API
 
-- [ ] **FILE-01**: 用户上传 PDF 文件后系统自动提取文本内容进入 Ingest Pipeline
-- [ ] **FILE-02**: 用户上传 DOCX 文件后系统自动提取文本内容进入 Ingest Pipeline
-- [ ] **FILE-03**: 用户上传 HTML 文件后系统自动提取正文内容 (去除标签)
+- [ ] **API-01**: 用户可在设置中创建/撤销 API Key (AES-256 加密存储)
+- [ ] **API-02**: API Key 支持权限 scope (read/write/admin)
+- [ ] **API-03**: Scalar 自动生成 OpenAPI 文档 + Try It 调试界面
 
-### Multi-Provider
+### SSO
 
-- [ ] **MPROV-01**: 管理员可配置多个 LLM Provider (OpenAI/Anthropic/Custom)
-- [ ] **MPROV-02**: 主 Provider 熔断后自动 Fallback 到备用 Provider
-- [ ] **MPROV-03**: 租户可自带 API Key 并选择 Provider
+- [ ] **SSO-01**: 支持 SAML SSO 登录 (通过 better-auth 插件或替代方案)
+- [ ] **SSO-02**: 组织管理员可配置 SSO Provider
 
-### Rate Limiting
+### Graph
 
-- [ ] **RATE-01**: API 全局请求速率限制 (Redis 滑动窗口)
-- [ ] **RATE-02**: 租户级 API 调用限制 (per-organization)
-- [ ] **RATE-03**: 端点级限制 (LLM 相关端点更严格)
+- [ ] **GRAPH-01**: 全局知识图谱使用 WebGL 渲染 (sigma.js)
+- [ ] **GRAPH-02**: 支持 1000+ 节点流畅交互
 
-### Version Diff
+### Deployment
 
-- [ ] **DIFF-01**: Wiki 页面版本列表可查看两个版本之间的 content diff
+- [ ] **HELM-01**: Helm Chart 包含所有服务 (postgres + redis + minio + api + worker + web)
+- [ ] **HELM-02**: values.yaml 支持关键配置参数化
 
-### Source Revocation
+### Billing
 
-- [ ] **REVK-01**: 删除 Source 时，关联的 Wiki 页面标记为 flagged
-- [ ] **REVK-02**: 前端 Flagged 队列展示受影响页面及操作选项 (确认/编辑/删除)
+- [ ] **BILL-01**: 订阅计划管理 (Free/Pro/Enterprise tier)
+- [ ] **BILL-02**: 按用量计费 (Token 消耗 + 存储)
+- [ ] **BILL-03**: Stripe 支付集成
 
-### Caching
+### Export
 
-- [ ] **CACHE-01**: Wiki 页面详情 Redis 缓存 (TTL + write-through 失效)
-- [ ] **CACHE-02**: 查询结果 Redis 缓存 (hash(question + wiki_version) → answer, TTL 1h)
-- [ ] **CACHE-03**: Redis 不可用时降级为直接查询 (cache-aside)
+- [ ] **EXPT-01**: Wiki 导出为 Markdown ZIP 文件
+- [ ] **EXPT-02**: Wiki 导出为 PDF 文件
 
-### Embedding Migration
+### Collaboration
 
-- [ ] **EMB-01**: 支持新增 embedding_v2 列 (不同维度/模型)
-- [ ] **EMB-02**: 后台任务异步用新模型重算旧数据的 embedding
-- [ ] **EMB-03**: 搜索自动使用新列 (已迁移数据) + 标注未迁移数据
-
-## v2 Requirements
+- [ ] **COLLAB-01**: 用户可在 Wiki 页面添加评论
+- [ ] **COLLAB-02**: 评论支持 @提及其他用户
+- [ ] **COLLAB-03**: Wiki 编辑审批流 (editor 编辑 → admin 审批)
 
 ### Observability
 
-- **OBS-01**: OpenTelemetry 替代自建 trace_id
-- **OBS-02**: Prometheus metrics 导出 (请求延迟、队列深度、Token 消耗率)
-
-### Data Partitioning
-
-- **PART-01**: activity_logs 按月分区
-- **PART-02**: llm_invocations 按月分区
-
-### Data Compliance
-
-- **GDPR-01**: Workspace 数据导出 (GDPR Article 20)
-- **GDPR-02**: 数据保留策略配置
+- [ ] **OBS-01**: OpenTelemetry tracing 替代自建 trace_id
+- [ ] **OBS-02**: Prometheus metrics 端点 (请求延迟/队列深度/Token 消耗率)
+- [ ] **OBS-03**: Grafana 运营仪表盘模板
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| SSO/SAML | Phase 2 — 需验证 better-auth 支持度 |
-| 开放 API + API Key 管理 | Phase 2 — 非核心 |
-| Helm Chart | Phase 2 — 先验证 docker compose |
-| 计费系统 | Phase 2 — 先做内部使用 |
-| 全局知识图谱 (WebGL) | Phase 2 — ego graph 够用 |
+| 移动端 App | Web-first 策略 |
+| 实时协同编辑 | 复杂度高, 先做评论+审批 |
+| 视频/音频处理 | 超出文本知识库范畴 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FILE-01 | Phase 1 | Pending |
-| FILE-02 | Phase 1 | Pending |
-| FILE-03 | Phase 1 | Pending |
-| MPROV-01 | Phase 2 | Pending |
-| MPROV-02 | Phase 2 | Pending |
-| MPROV-03 | Phase 2 | Pending |
-| RATE-01 | Phase 3 | Pending |
-| RATE-02 | Phase 3 | Pending |
-| RATE-03 | Phase 3 | Pending |
-| DIFF-01 | Phase 4 | Pending |
-| REVK-01 | Phase 4 | Pending |
-| REVK-02 | Phase 4 | Pending |
-| CACHE-01 | Phase 5 | Pending |
-| CACHE-02 | Phase 5 | Pending |
-| CACHE-03 | Phase 5 | Pending |
-| EMB-01 | Phase 6 | Pending |
-| EMB-02 | Phase 6 | Pending |
-| EMB-03 | Phase 6 | Pending |
+| API-01 | Phase 1 | Pending |
+| API-02 | Phase 1 | Pending |
+| API-03 | Phase 1 | Pending |
+| SSO-01 | Phase 2 | Pending |
+| SSO-02 | Phase 2 | Pending |
+| GRAPH-01 | Phase 3 | Pending |
+| GRAPH-02 | Phase 3 | Pending |
+| HELM-01 | Phase 4 | Pending |
+| HELM-02 | Phase 4 | Pending |
+| BILL-01 | Phase 5 | Pending |
+| BILL-02 | Phase 5 | Pending |
+| BILL-03 | Phase 5 | Pending |
+| EXPT-01 | Phase 6 | Pending |
+| EXPT-02 | Phase 6 | Pending |
+| COLLAB-01 | Phase 7 | Pending |
+| COLLAB-02 | Phase 7 | Pending |
+| COLLAB-03 | Phase 7 | Pending |
+| OBS-01 | Phase 8 | Pending |
+| OBS-02 | Phase 8 | Pending |
+| OBS-03 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 18 total
-- Mapped to phases: 18
+- v1 requirements: 20 total
+- Mapped to phases: 20
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after v0.2.0 milestone start*
