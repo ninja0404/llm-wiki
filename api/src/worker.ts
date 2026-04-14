@@ -11,7 +11,7 @@ import { CIRCUIT_BREAKER_TTL_S } from '@llm-wiki/shared';
 import { db } from './lib/db.js';
 import { sources, wikiPages, workspaces } from './db/schema/index.js';
 import { eq } from 'drizzle-orm';
-import { ingestQueue, embeddingQueue } from './jobs/queues.js';
+import { ingestQueue, embeddingQueue, lintQueue } from './jobs/queues.js';
 
 async function decrTenantIngest(sourceId: string) {
   try {
@@ -158,8 +158,28 @@ function setupGracefulShutdown(workers: Worker[]) {
   process.on('SIGINT', shutdown);
 }
 
+async function scheduleLintCron() {
+  const allWorkspaces = await db.query.workspaces.findMany({
+    columns: { id: true },
+  });
+
+  for (const ws of allWorkspaces) {
+    await lintQueue.add(
+      'lint-workspace',
+      { workspaceId: ws.id },
+      {
+        jobId: `lint-cron-${ws.id}`,
+        repeat: { pattern: '0 3 * * *' },
+      },
+    );
+  }
+  logger.info({ workspaces: allWorkspaces.length }, 'Lint cron scheduled for all workspaces');
+}
+
 async function start() {
   logger.info('Worker process started');
+
+  await scheduleLintCron();
 
   setInterval(async () => {
     try {

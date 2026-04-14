@@ -99,7 +99,8 @@ services:
   worker:
     build:
       context: .
-      dockerfile: api/Dockerfile.worker
+      dockerfile: api/Dockerfile
+    command: ["node", "api/dist/worker.js"]
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${PG_USER:-llmwiki}:${PG_PASSWORD:-llmwiki}@pgbouncer:6432/${PG_DB:-llmwiki}

@@ -29,4 +29,6 @@ COPY --from=deps /app/api/node_modules ./api/node_modules
 COPY package.json pnpm-workspace.yaml ./
 
 EXPOSE 3001
+
+# Default: API server. Override CMD for worker: ["node", "api/dist/worker.js"]
 CMD ["node", "api/dist/server.js"]
