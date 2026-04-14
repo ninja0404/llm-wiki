@@ -354,7 +354,7 @@ export function ChatView() {
                 setInput(e.target.value);
                 const el = e.target;
                 el.style.height = 'auto';
-                el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+                el.style.height = Math.min(el.scrollHeight, 200) + 'px';
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -364,8 +364,8 @@ export function ChatView() {
               }}
               disabled={streaming}
               rows={1}
-              className="w-full resize-none rounded-xl border border-zinc-300 py-3 pl-4 pr-12 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
-              style={{ maxHeight: '150px' }}
+              className="w-full resize-none overflow-y-auto rounded-xl border border-zinc-300 py-3 pl-4 pr-12 text-sm leading-relaxed outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+              style={{ maxHeight: '200px' }}
             />
             <button
               type="submit"
