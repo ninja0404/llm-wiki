@@ -370,7 +370,7 @@ export function ChatView() {
             <button
               type="submit"
               disabled={streaming || !input.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-primary-600 hover:bg-primary-50 disabled:opacity-30"
+              className="absolute bottom-2 right-2 rounded-lg p-2 text-primary-600 hover:bg-primary-50 disabled:opacity-30"
             >
               <Send className="h-4 w-4" />
             </button>
