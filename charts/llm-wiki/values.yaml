@@ -1,0 +1,100 @@
+replicaCount:
+  api: 1
+  worker: 1
+  web: 1
+
+image:
+  api:
+    repository: llm-wiki/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  worker:
+    repository: llm-wiki/worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  web:
+    repository: llm-wiki/web
+    tag: latest
+    pullPolicy: IfNotPresent
+
+service:
+  api:
+    type: ClusterIP
+    port: 3001
+  web:
+    type: ClusterIP
+    port: 80
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: wiki.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+env:
+  NODE_ENV: production
+  PORT: "3001"
+  BASE_URL: "http://localhost:3001"
+  CORS_ORIGINS: "http://localhost"
+  TRUSTED_ORIGINS: "http://localhost"
+
+secrets:
+  betterAuthSecret: ""
+  encryptionKey: ""
+  openaiApiKey: ""
+
+postgresql:
+  enabled: true
+  auth:
+    username: llmwiki
+    password: llmwiki
+    database: llmwiki
+  primary:
+    persistence:
+      size: 10Gi
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 2Gi
+
+minio:
+  enabled: true
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+  defaultBuckets: llmwiki
+  persistence:
+    size: 10Gi
+
+resources:
+  api:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  worker:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  web:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi

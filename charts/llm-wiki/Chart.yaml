@@ -1,0 +1,12 @@
+apiVersion: v2
+name: llm-wiki
+description: LLM-powered knowledge base that automatically builds and maintains structured wikis
+type: application
+version: 0.3.0
+appVersion: "0.3.0"
+keywords:
+  - llm
+  - wiki
+  - knowledge-base
+  - rag
+home: https://github.com/llm-wiki/llm-wiki
