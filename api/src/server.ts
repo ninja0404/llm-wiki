@@ -93,6 +93,9 @@ app.route('/', healthRoutes);
 import metricsRoutes from './routes/metrics.js';
 app.route('/', metricsRoutes);
 
+import openapiRoutes from './routes/openapi.js';
+app.route('/api', openapiRoutes);
+
 app.on(['POST', 'GET'], '/api/auth/**', (c) => auth.handler(c.req.raw));
 
 // ── WebSocket ──
