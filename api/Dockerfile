@@ -1,22 +1,21 @@
-FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+FROM oven/bun:1 AS base
 WORKDIR /app
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json bun.lock pnpm-workspace.yaml ./
 COPY api/package.json api/
 COPY packages/shared/package.json packages/shared/
-RUN pnpm install --frozen-lockfile --prod=false
+RUN bun install --frozen-lockfile
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/api/node_modules ./api/node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY . .
-RUN cd packages/shared && pnpm build
-RUN cd api && pnpm build
+RUN cd packages/shared && bun run build
+RUN cd api && bun run build
 
-FROM node:22-alpine AS runner
+FROM oven/bun:1-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/api/dist ./api/dist
@@ -30,5 +29,4 @@ COPY package.json pnpm-workspace.yaml ./
 
 EXPOSE 3001
 
-# Default: API server. Override CMD for worker: ["node", "api/dist/worker.js"]
-CMD ["node", "api/dist/server.js"]
+CMD ["bun", "api/dist/server.js"]
