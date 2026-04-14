@@ -115,7 +115,11 @@ export function ChatView() {
         },
       );
 
-      if (!res.ok || !res.body) throw new Error('Stream failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || `Request failed (${res.status})`);
+      }
+      if (!res.body) throw new Error('No response stream');
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -134,6 +138,9 @@ export function ChatView() {
           if (payload === '[DONE]') continue;
           try {
             const parsed = JSON.parse(payload);
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
             if (parsed.text) {
               accumulated += parsed.text;
               setStreamContent(accumulated);
@@ -157,8 +164,15 @@ export function ChatView() {
       setMessages((prev) => [...prev, assistantMsg]);
       setStreamContent('');
       setStreamCitations([]);
-    } catch {
-      // error handling
+    } catch (err) {
+      const errorMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `⚠️ Error: ${err instanceof Error ? err.message : 'Failed to get response'}. Please check your LLM API Key in Settings.`,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      setStreamContent('');
     } finally {
       setStreaming(false);
     }
