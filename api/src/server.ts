@@ -41,7 +41,7 @@ const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 // ── Middleware ──
 
 app.use('*', cors({
-  origin: ['http://localhost:5173'],
+  origin: config.corsOrigins,
   credentials: true,
 }));
 
@@ -177,7 +177,29 @@ app.route('/api/workspaces/:workspaceId', workspaceScoped);
 
 // ── Start ──
 
+function validateProductionSecrets() {
+  if (config.nodeEnv !== 'production') return;
+
+  const issues: string[] = [];
+
+  if (config.betterAuthSecret === 'dev-secret-change-in-production') {
+    issues.push('BETTER_AUTH_SECRET is using the default value');
+  }
+  if (config.encryptionKey === '0'.repeat(64)) {
+    issues.push('ENCRYPTION_KEY is using the default zero-filled value');
+  }
+
+  if (issues.length > 0) {
+    for (const issue of issues) {
+      logger.error({ issue }, 'SECURITY: Production secret misconfiguration');
+    }
+    logger.fatal('Refusing to start with insecure default secrets in production. Set BETTER_AUTH_SECRET and ENCRYPTION_KEY.');
+    process.exit(1);
+  }
+}
+
 async function start() {
+  validateProductionSecrets();
   await initWsSubscriber();
 
   const server = serve({ fetch: app.fetch, port: config.port }, (info) => {

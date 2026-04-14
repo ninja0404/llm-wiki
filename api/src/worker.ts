@@ -140,8 +140,10 @@ function setupGracefulShutdown(workers: Worker[]) {
 async function start() {
   logger.info('Worker process started');
 
-  // Worker heartbeat
-  setInterval(() => {
+  setInterval(async () => {
+    try {
+      await redis.set('worker:heartbeat', String(Date.now()), 'EX', 60);
+    } catch { /* non-critical */ }
     logger.debug({ uptime: process.uptime() }, 'Worker heartbeat');
   }, 30_000);
 
