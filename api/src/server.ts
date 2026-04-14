@@ -198,6 +198,9 @@ workspaceScoped.route('/lint', lintRoutes);
 import exportRoutes from './routes/export.js';
 workspaceScoped.route('/export', exportRoutes);
 
+import commentsRoutes from './routes/comments.js';
+workspaceScoped.route('/', commentsRoutes);
+
 app.route('/api/workspaces/:workspaceId', workspaceScoped);
 
 // ── Start ──

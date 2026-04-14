@@ -6,3 +6,4 @@ export * from './chat.js';
 export * from './system.js';
 export * from './api-key.js';
 export * from './billing.js';
+export * from './collaboration.js';
