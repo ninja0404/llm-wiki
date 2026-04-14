@@ -1,0 +1,207 @@
+import { Hono } from 'hono';
+import { db } from '../lib/db.js';
+import { sources, workspaces } from '../db/schema/index.js';
+import { eq, and } from 'drizzle-orm';
+import { createHash } from 'crypto';
+import { validateUrl, fetchUrl, SsrfError } from '../lib/ssrf.js';
+import { uploadFile } from '../lib/storage.js';
+import { splitIntoChunks } from '../ingest/chunker.js';
+import { ingestQueue } from '../jobs/queues.js';
+import { redis } from '../lib/redis.js';
+import { logger } from '../lib/logger.js';
+import { EXTRACT_BATCH_SIZE, TENANT_MAX_CONCURRENT_INGEST } from '@llm-wiki/shared';
+
+const app = new Hono();
+
+app.get('/', async (c) => {
+  const workspaceId = c.req.param('workspaceId')!;
+  const result = await db.query.sources.findMany({
+    where: eq(sources.workspaceId, workspaceId),
+    orderBy: (s, { desc }) => [desc(s.createdAt)],
+  });
+  return c.json({ data: result });
+});
+
+app.post('/text', async (c) => {
+  const workspaceId = c.req.param('workspaceId')!;
+  const body = await c.req.json<{ title: string; content: string }>();
+
+  const contentHash = createHash('sha256').update(body.content).digest('hex');
+
+  const dup = await checkDuplicate(workspaceId, contentHash);
+  if (dup) return c.json(dup, 409);
+
+  const source = await createSource(workspaceId, {
+    title: body.title,
+    sourceType: 'text',
+    rawContent: body.content,
+    contentHash,
+  });
+
+  return c.json({ data: source }, 201);
+});
+
+app.post('/url', async (c) => {
+  const workspaceId = c.req.param('workspaceId')!;
+  const body = await c.req.json<{ title: string; url: string }>();
+
+  try {
+    await validateUrl(body.url);
+  } catch (err) {
+    if (err instanceof SsrfError) {
+      return c.json({ error: 'Forbidden', message: err.message }, 403);
+    }
+    throw err;
+  }
+
+  let rawContent: string;
+  try {
+    rawContent = await fetchUrl(body.url);
+  } catch (err) {
+    return c.json(
+      { error: 'FetchFailed', message: err instanceof Error ? err.message : 'Failed to fetch URL' },
+      422,
+    );
+  }
+
+  const contentHash = createHash('sha256').update(rawContent).digest('hex');
+
+  const dup = await checkDuplicate(workspaceId, contentHash);
+  if (dup) return c.json(dup, 409);
+
+  const source = await createSource(workspaceId, {
+    title: body.title,
+    sourceType: 'url',
+    rawContent,
+    url: body.url,
+    contentHash,
+  });
+
+  return c.json({ data: source }, 201);
+});
+
+app.post('/file', async (c) => {
+  const workspaceId = c.req.param('workspaceId')!;
+  const formData = await c.req.formData();
+  const file = formData.get('file') as File | null;
+  const title = formData.get('title') as string | null;
+
+  if (!file) return c.json({ error: 'Missing file' }, 400);
+  if (!title) return c.json({ error: 'Missing title' }, 400);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    return c.json({ error: 'File too large', message: 'Maximum file size is 10MB' }, 413);
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const rawContent = buffer.toString('utf-8');
+  const contentHash = createHash('sha256').update(rawContent).digest('hex');
+
+  const dup = await checkDuplicate(workspaceId, contentHash);
+  if (dup) return c.json(dup, 409);
+
+  const fileKey = `${workspaceId}/${crypto.randomUUID()}/${file.name}`;
+  await uploadFile(fileKey, buffer, file.type || 'application/octet-stream');
+
+  const source = await createSource(workspaceId, {
+    title,
+    sourceType: 'file',
+    rawContent,
+    fileKey,
+    contentHash,
+  });
+
+  return c.json({ data: source }, 201);
+});
+
+app.get('/:id', async (c) => {
+  const id = c.req.param('id')!;
+  const source = await db.query.sources.findFirst({
+    where: eq(sources.id, id),
+  });
+
+  if (!source) return c.json({ error: 'Not found' }, 404);
+  return c.json({ data: source });
+});
+
+async function checkDuplicate(workspaceId: string, contentHash: string) {
+  const existing = await db.query.sources.findFirst({
+    where: and(
+      eq(sources.workspaceId, workspaceId),
+      eq(sources.contentHash, contentHash),
+    ),
+  });
+  if (existing) {
+    return {
+      error: 'Duplicate',
+      message: 'A source with identical content already exists',
+      existingId: existing.id,
+    };
+  }
+  return null;
+}
+
+async function createSource(
+  workspaceId: string,
+  data: {
+    title: string;
+    sourceType: 'text' | 'url' | 'file';
+    rawContent: string;
+    url?: string;
+    fileKey?: string;
+    contentHash: string;
+  },
+) {
+  // Tenant-level concurrency limit
+  const ws = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, workspaceId),
+    columns: { organizationId: true },
+  });
+  if (ws) {
+    const key = `tenant:${ws.organizationId}:ingest:active`;
+    const active = await redis.incr(key);
+    await redis.expire(key, 300);
+    if (active > TENANT_MAX_CONCURRENT_INGEST) {
+      await redis.decr(key);
+      throw new Error('Concurrent ingest limit reached');
+    }
+  }
+
+  const traceId = crypto.randomUUID();
+  const chunks = splitIntoChunks(data.rawContent);
+  const totalBatches = Math.ceil(chunks.length / EXTRACT_BATCH_SIZE);
+
+  const [source] = await db
+    .insert(sources)
+    .values({
+      workspaceId,
+      title: data.title,
+      sourceType: data.sourceType,
+      rawContent: data.rawContent,
+      url: data.url,
+      fileKey: data.fileKey,
+      contentHash: data.contentHash,
+      traceId,
+      status: 'pending',
+      ingestState: {
+        totalBatches,
+        completedBatches: 0,
+        failedBatches: [],
+      },
+    })
+    .returning();
+
+  for (let i = 0; i < totalBatches; i++) {
+    await ingestQueue.add(
+      'extract-batch',
+      { sourceId: source.id, workspaceId, batchIndex: i, traceId, totalBatches },
+      { jobId: `extract-${source.id}-${i}`, priority: i },
+    );
+  }
+
+  logger.info({ sourceId: source.id, totalBatches, traceId }, 'Ingest jobs enqueued');
+  return source;
+}
+
+export default app;
