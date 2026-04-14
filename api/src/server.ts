@@ -36,6 +36,7 @@ import flaggedRoutes from './routes/flagged.js';
 import lintRoutes from './routes/lint.js';
 import apiKeysRoutes from './routes/api-keys.js';
 import ssoRoutes from './routes/sso.js';
+import billingRoutes from './routes/billing.js';
 import { apiReference } from '@scalar/hono-api-reference';
 
 const app = new Hono();
@@ -151,6 +152,7 @@ app.use('/api/*', tenantRateLimit(RATE_LIMITS.tenant));
 app.route('/api/me', meRoutes);
 app.route('/api/api-keys', apiKeysRoutes);
 app.route('/api/sso', ssoRoutes);
+app.route('/api/billing', billingRoutes);
 
 app.get('/docs', apiReference({
   theme: 'default',

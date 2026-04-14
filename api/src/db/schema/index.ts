@@ -5,3 +5,4 @@ export * from './wiki.js';
 export * from './chat.js';
 export * from './system.js';
 export * from './api-key.js';
+export * from './billing.js';
