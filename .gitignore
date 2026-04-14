@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+.vite/
+.turbo/
+
+# Drizzle
+drizzle/meta/
+
+# MinIO data
+minio-data/
