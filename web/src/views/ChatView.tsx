@@ -347,13 +347,25 @@ export function ChatView() {
 
         <form onSubmit={handleSend} className="border-t border-zinc-200 p-4 dark:border-zinc-800">
           <div className="relative mx-auto max-w-2xl">
-            <input
-              type="text"
+            <textarea
               placeholder="Ask a question..."
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                const el = e.target;
+                el.style.height = 'auto';
+                el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (input.trim() && !streaming) handleSend(e as unknown as FormEvent);
+                }
+              }}
               disabled={streaming}
-              className="w-full rounded-xl border border-zinc-300 py-3 pl-4 pr-12 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+              rows={1}
+              className="w-full resize-none rounded-xl border border-zinc-300 py-3 pl-4 pr-12 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+              style={{ maxHeight: '150px' }}
             />
             <button
               type="submit"
