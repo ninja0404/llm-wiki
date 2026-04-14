@@ -14,6 +14,7 @@ import {
   initWsSubscriber,
 } from './lib/ws.js';
 import { globalRateLimit, tenantRateLimit, endpointRateLimit, RATE_LIMITS } from './lib/rate-limit.js';
+import { httpRequestDuration, httpRequestTotal } from './lib/metrics.js';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/dist/queueAdapters/bullMQ.js';
 import { HonoAdapter } from '@bull-board/hono';
@@ -54,6 +55,16 @@ if (config.nodeEnv !== 'production') {
   app.use('*', honoLogger());
 }
 
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  await next();
+  const duration = (Date.now() - start) / 1000;
+  const route = c.req.routePath || c.req.path;
+  const labels = { method: c.req.method, route, status_code: String(c.res.status) };
+  httpRequestDuration.observe(labels, duration);
+  httpRequestTotal.inc(labels);
+});
+
 // ── Bull Board (auth protected) ──
 
 app.use('/bull/*', async (c, next) => {
@@ -78,6 +89,9 @@ app.route('/bull', serverAdapter.registerPlugin());
 // ── Public routes ──
 
 app.route('/', healthRoutes);
+
+import metricsRoutes from './routes/metrics.js';
+app.route('/', metricsRoutes);
 
 app.on(['POST', 'GET'], '/api/auth/**', (c) => auth.handler(c.req.raw));
 
