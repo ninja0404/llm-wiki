@@ -34,6 +34,8 @@ import activityRoutes from './routes/activity.js';
 import chatRoutes from './routes/chat.js';
 import flaggedRoutes from './routes/flagged.js';
 import lintRoutes from './routes/lint.js';
+import apiKeysRoutes from './routes/api-keys.js';
+import { apiReference } from '@scalar/hono-api-reference';
 
 const app = new Hono();
 
@@ -146,6 +148,12 @@ app.use('/api/*', async (c, next) => {
 app.use('/api/*', tenantRateLimit(RATE_LIMITS.tenant));
 
 app.route('/api/me', meRoutes);
+app.route('/api/api-keys', apiKeysRoutes);
+
+app.get('/docs', apiReference({
+  theme: 'default',
+  spec: { url: '/api/openapi.json' },
+}));
 app.route('/api/workspaces', workspaceRoutes);
 
 // Workspace-scoped routes with authorization guard
