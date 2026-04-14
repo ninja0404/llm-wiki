@@ -1,6 +1,3 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
 import mammoth from 'mammoth';
 
 const SUPPORTED_TYPES = new Map<string, string>([
@@ -43,7 +40,8 @@ function inferTypeFromMime(mime: string): string | null {
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
-  const data = await pdf(buffer);
+  const pdfParse = await import('pdf-parse').then((m) => m.default || m);
+  const data = await pdfParse(buffer);
   return data.text.replace(/\n{3,}/g, '\n\n').trim();
 }
 
