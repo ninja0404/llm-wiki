@@ -3,6 +3,8 @@ import { Send, MessageSquare, Plus, Loader2, BookPlus, Trash2 } from 'lucide-rea
 import ReactMarkdown from 'react-markdown';
 import { useWorkspaceStore } from '@/store/workspace';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface Conversation {
   id: string;

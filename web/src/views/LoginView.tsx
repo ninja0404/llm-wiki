@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { FileText } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 export function LoginView() {
   const navigate = useNavigate();
@@ -35,7 +38,6 @@ export function LoginView() {
       }
 
       if (!isLogin) {
-        // Auto-login after signup
         const loginRes = await fetch('/api/auth/sign-in/email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -55,66 +57,61 @@ export function LoginView() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-      <div className="w-full max-w-sm space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex flex-col items-center gap-2">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="flex flex-col items-center gap-2 pb-2">
           <FileText className="h-10 w-10 text-primary-600" />
           <h1 className="text-xl font-bold">LLM Wiki</h1>
           <p className="text-sm text-zinc-500">
             {isLogin ? 'Sign in to your account' : 'Create a new account'}
           </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <input
-              type="text"
-              placeholder="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-zinc-700 dark:bg-zinc-800"
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <Input
+                type="text"
+                placeholder="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            )}
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-zinc-700 dark:bg-zinc-800"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-zinc-700 dark:bg-zinc-800"
-            required
-            minLength={8}
-          />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
-          </button>
-        </form>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLogin ? 'Sign In' : 'Sign Up'}
+            </Button>
+          </form>
 
-        <p className="text-center text-sm text-zinc-500">
-          {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-          <button
-            type="button"
-            onClick={() => setIsLogin(!isLogin)}
-            className="font-medium text-primary-600 hover:text-primary-700"
-          >
-            {isLogin ? 'Sign Up' : 'Sign In'}
-          </button>
-        </p>
-      </div>
+          <p className="mt-4 text-center text-sm text-zinc-500">
+            {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="font-medium text-primary-600 hover:text-primary-700"
+            >
+              {isLogin ? 'Sign Up' : 'Sign In'}
+            </button>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

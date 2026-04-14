@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Book, Upload, MessageSquare, Activity, AlertTriangle, Check, Archive, Trash2 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspace';
 import { Link } from 'react-router';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 interface FlaggedPage {
   id: string;
