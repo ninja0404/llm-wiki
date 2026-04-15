@@ -341,7 +341,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
       <Card className="shadow-sm ring-slate-200/80">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Key size={15} /> Agent Tokens</CardTitle>
-          <CardDescription>Workspace-scoped tokens for AI agents to access the vault via MCP or REST API.</CardDescription>
+          <CardDescription>{t("agentTokensDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Create Token */}
@@ -370,7 +370,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
               </div>
             </div>
             <Button onClick={handleCreateToken} disabled={creatingToken || !newTokenName.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Plus size={14} /> Create
+              <Plus size={14} /> {t("create")}
             </Button>
           </div>
 
@@ -396,10 +396,10 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50/80">
-                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</TableHead>
-                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prefix</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("name")}</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("prefix")}</TableHead>
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("scope")}</TableHead>
-                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Last Used</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("lastUsed")}</TableHead>
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider w-16" />
               </TableRow>
             </TableHeader>
@@ -409,7 +409,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
                   <TableCell colSpan={5} className="h-20">
                     <div className="flex flex-col items-center justify-center gap-1.5 text-slate-400">
                       <Key size={22} strokeWidth={1.5} />
-                      <p className="text-sm">No agent tokens. Create one to connect agents via MCP.</p>
+                      <p className="text-sm">{t("noTokens")}</p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -440,8 +440,8 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
       {/* MCP Usage Guide */}
       <Card className="shadow-sm ring-slate-200/80">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Server size={15} /> MCP Configuration</CardTitle>
-          <CardDescription>Connect AI agents to this workspace via the Model Context Protocol.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Server size={15} /> {t("mcpConfig")}</CardTitle>
+          <CardDescription>{t("mcpDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -460,7 +460,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Shield size={14} /> Token Scopes</p>
+            <p className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Shield size={14} /> {t("tokenScopes")}</p>
             <div className="grid grid-cols-3 gap-3 text-sm">
               <div className="space-y-0.5">
                 <Badge variant="secondary">read</Badge>
@@ -478,7 +478,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-sm font-medium text-slate-700">Available MCP Tools</p>
+            <p className="text-sm font-medium text-slate-700">{t("availableTools")}</p>
             <div className="flex flex-wrap gap-2">
               {["search", "read", "create", "replace", "append", "delete", "lint", "guide"].map((tool) => (
                 <Badge key={tool} variant="outline">{tool}</Badge>
