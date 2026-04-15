@@ -1,51 +1,28 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg16
-    ports:
-      - "${PG_PORT:-5432}:5432"
+    image: ankane/pgvector:latest
     environment:
-      POSTGRES_USER: ${PG_USER:-llmwiki}
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-llmwiki}
-      POSTGRES_DB: ${PG_DB:-llmwiki}
+      POSTGRES_USER: ${POSTGRES_USER:-llmwiki}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-llmwiki}
+      POSTGRES_DB: ${POSTGRES_DB:-llmwiki}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/migrations/001_vnext_schema.sql:/docker-entrypoint-initdb.d/001_vnext_schema.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-llmwiki}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-llmwiki} -d ${POSTGRES_DB:-llmwiki}"]
       interval: 5s
       timeout: 3s
-      retries: 5
-
-  pgbouncer:
-    image: bitnami/pgbouncer:1
-    ports:
-      - "${PGBOUNCER_PORT:-6432}:6432"
-    environment:
-      POSTGRESQL_HOST: postgres
-      POSTGRESQL_PORT: 5432
-      POSTGRESQL_USERNAME: ${PG_USER:-llmwiki}
-      POSTGRESQL_PASSWORD: ${PG_PASSWORD:-llmwiki}
-      POSTGRESQL_DATABASE: ${PG_DB:-llmwiki}
-      PGBOUNCER_DATABASE: ${PG_DB:-llmwiki}
-      PGBOUNCER_POOL_MODE: transaction
-      PGBOUNCER_MAX_CLIENT_CONN: 200
-      PGBOUNCER_DEFAULT_POOL_SIZE: 20
-    depends_on:
-      postgres:
-        condition: service_healthy
+      retries: 30
 
   redis:
     image: redis:7-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes
     volumes:
       - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
   minio:
     image: minio/minio:latest
@@ -58,11 +35,93 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - miniodata:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+
+  platform-api:
+    build:
+      context: .
+      dockerfile: services/platform_api/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://llmwiki:llmwiki@postgres:5432/llmwiki
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      API_URL: http://platform-api:8000
+      MCP_URL: ${MCP_URL:-http://localhost:8080/mcp}
+      CONVERTER_URL: http://converter-service:8090
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  compiler-worker:
+    build:
+      context: .
+      dockerfile: services/compiler_worker/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://llmwiki:llmwiki@postgres:5432/llmwiki
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+
+  mcp-service:
+    build:
+      context: .
+      dockerfile: services/mcp_service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://llmwiki:llmwiki@postgres:5432/llmwiki
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      API_URL: http://platform-api:8000
+      MCP_URL: ${MCP_URL:-http://localhost:8080/mcp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      platform-api:
+        condition: service_started
+    ports:
+      - "8080:8080"
+
+  converter-service:
+    build:
+      context: .
+      dockerfile: services/converter_service/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8090:8090"
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_MCP_URL: http://localhost:8080/mcp
+      PLATFORM_API_URL: http://platform-api:8000
+    depends_on:
+      platform-api:
+        condition: service_started
+    ports:
+      - "3000:3000"
 
 volumes:
   pgdata:

@@ -1,27 +1,21 @@
 {
-  "name": "llm-wiki",
+  "name": "llm-wiki-vnext",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "bun run --filter @llm-wiki/api dev & bun run --filter @llm-wiki/api worker & bun run --filter @llm-wiki/web dev & wait",
-    "build": "bun run --filter '*' build",
-    "dev:api": "bun run --filter @llm-wiki/api dev",
-    "dev:web": "bun run --filter @llm-wiki/web dev",
-    "dev:worker": "bun run --filter @llm-wiki/api worker",
-    "db:generate": "bun run --filter @llm-wiki/api db:generate",
-    "db:migrate": "bun run --filter @llm-wiki/api db:migrate",
-    "db:push": "bun run --filter @llm-wiki/api db:push",
-    "db:studio": "bun run --filter @llm-wiki/api db:studio",
-    "docker:up": "docker compose up -d",
+    "dev": "python3 scripts/dev_stack.py",
+    "dev:check": "python3 scripts/check_local_stack.py",
+    "db:init": "python3 scripts/init_local_db.py",
+    "db:reset": "python3 scripts/init_local_db.py --reset",
+    "dev:web": "cd web && bun dev",
+    "dev:platform-api": "uvicorn services.platform_api.app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:compiler-worker": "python -m services.compiler_worker.app.main",
+    "dev:mcp-service": "uvicorn services.mcp_service.app.main:app --reload --host 0.0.0.0 --port 8080",
+    "dev:converter-service": "uvicorn services.converter_service.app.main:app --reload --host 0.0.0.0 --port 8090",
+    "build:web": "cd web && bun run build",
+    "test:python": "pytest tests/unit tests/integration",
+    "test": "pytest tests/unit tests/integration",
+    "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
-    "lint": "bun run --filter '*' lint"
-  },
-  "engines": {
-    "bun": ">=1.3.0"
-  },
-  "workspaces": [
-    "api",
-    "web",
-    "packages/*"
-  ]
+    "lint:web": "cd web && bun run lint"
+  }
 }
