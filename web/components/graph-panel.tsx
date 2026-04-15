@@ -108,9 +108,9 @@ export function GraphPanel({ workspaceId, workspaceName }: { workspaceId: string
           {s.truncated && <Badge variant="destructive">{t("truncated")}</Badge>}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <FilterToggle label="Claims" active={showClaims} onChange={setShowClaims} />
-          <FilterToggle label="Documents" active={showDocuments} onChange={setShowDocuments} />
-          <FilterToggle label="References" active={showReferences} onChange={setShowReferences} />
+          <FilterToggle label={t("claims")} active={showClaims} onChange={setShowClaims} />
+          <FilterToggle label={t("documents")} active={showDocuments} onChange={setShowDocuments} />
+          <FilterToggle label={t("references")} active={showReferences} onChange={setShowReferences} />
           <div className="flex items-center gap-1.5 ml-2">
             <input type="text" value={focusDocId} onChange={(e) => setFocusDocId(e.target.value.trim())} placeholder={t("focusDoc")} className="h-7 w-40 rounded-lg border border-slate-200 bg-white px-2.5 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
             {focusDocId && <button type="button" onClick={() => setFocusDocId("")} className="text-xs text-slate-400 hover:text-slate-600">{t("clear")}</button>}

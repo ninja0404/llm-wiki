@@ -107,7 +107,8 @@
     "edge": "Edge",
     "openVault": "Open in Vault",
     "searchWiki": "Search Wiki",
-    "focusThis": "Focus on this document"
+    "focusThis": "Focus on this document",
+    "references": "References"
   },
   "settings": {
     "title": "Settings / MCP",
@@ -176,7 +177,8 @@
     "noPages": "No pages found.",
     "noBlocks": "No blocks found.",
     "noRevisions": "No revisions found.",
-    "noReferences": "No references found."
+    "noReferences": "No references found.",
+    "sourceDocuments": "Source Documents"
   },
   "common": {
     "workspace": "Workspace",

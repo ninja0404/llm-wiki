@@ -107,7 +107,8 @@
     "edge": "连线",
     "openVault": "在知识库中打开",
     "searchWiki": "搜索 Wiki",
-    "focusThis": "聚焦此文档"
+    "focusThis": "聚焦此文档",
+    "references": "引用关系"
   },
   "settings": {
     "title": "设置 / MCP",
@@ -176,7 +177,8 @@
     "noPages": "暂无页面。",
     "noBlocks": "暂无文本块。",
     "noRevisions": "暂无版本记录。",
-    "noReferences": "暂无引用关系。"
+    "noReferences": "暂无引用关系。",
+    "sourceDocuments": "源文档"
   },
   "common": {
     "workspace": "工作区",
