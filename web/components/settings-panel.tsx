@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, FormEvent, useCallback } from "react";
 import { Check, Copy, Key, Plus, Server, Trash2, Shield } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { getApiUrl } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
@@ -101,6 +102,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
   const [activeWsId, setActiveWsId] = useState(workspaces[0]?.id ?? "");
   const activeWs = workspaces.find((w) => w.id === activeWsId);
 
+  const t = useTranslations("settings");
   const [settings, setSettings] = useState<WorkspaceSettings | null>(null);
   const [tokens, setTokens] = useState<AgentToken[]>([]);
   const [saving, setSaving] = useState(false);
@@ -195,7 +197,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
       {/* Compiler Settings Form */}
       <Card className="shadow-sm ring-slate-200/80">
         <CardHeader>
-          <CardTitle>Compiler Settings</CardTitle>
+          <CardTitle>{{t("compiler")}}</CardTitle>
           <CardDescription>LLM and embedding provider configuration for this workspace.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -320,7 +322,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
 
               <div className="flex items-center gap-3 pt-2">
                 <Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {saving ? "Saving…" : "Save Settings"}
+                  {saving ? t("saving") : t("save")}
                 </Button>
                 {saveMsg && (
                   <span className={`text-sm font-medium ${saveMsg.includes("failed") ? "text-red-600" : "text-emerald-600"}`}>
@@ -421,7 +423,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
                         {t.scope}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-500">{t.last_used_at ? new Date(t.last_used_at).toLocaleDateString() : "Never"}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{t.last_used_at ? new Date(t.last_used_at).toLocaleDateString() : t("never")}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon-xs" onClick={() => handleRevoke(t.id)} title="Revoke token">
                         <Trash2 size={14} className="text-red-500" />

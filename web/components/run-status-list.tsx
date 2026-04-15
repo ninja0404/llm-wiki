@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { getApiUrl } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
@@ -41,20 +42,22 @@ export function RunStatusList({ workspaceId, initialRuns }: { workspaceId: strin
     return () => { disposed = true; window.clearInterval(timer); };
   }, [workspaceId]);
 
+  const t = useTranslations("runs");
+
   return (
     <Card className="shadow-sm ring-slate-200/80">
       <CardHeader>
-        <CardTitle>Recent Runs</CardTitle>
+        <CardTitle>{t("recentRuns")}</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50/80">
-              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Run</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Actor</TableHead>
-              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Time</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("run")}</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("type")}</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("status")}</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("actor")}</TableHead>
+              <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("time")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -63,7 +66,7 @@ export function RunStatusList({ workspaceId, initialRuns }: { workspaceId: strin
                 <TableCell colSpan={5} className="h-32">
                   <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
                     <Bot size={28} strokeWidth={1.5} />
-                    <p className="text-sm">No recent runs in this workspace</p>
+                    <p className="text-sm">{t("noRecentRuns")}</p>
                   </div>
                 </TableCell>
               </TableRow>

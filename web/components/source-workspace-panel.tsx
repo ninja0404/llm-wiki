@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, FolderOpen } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { getApiUrl } from "@/lib/api";
 import { RunStatusList } from "@/components/run-status-list";
@@ -70,6 +71,8 @@ export function SourceWorkspacePanel({
     return () => { disposed = true; window.clearInterval(timer); };
   }, [hasActiveWork, workspaceId]);
 
+  const t = useTranslations("sources");
+
   return (
     <div className="space-y-6">
       {/* Stat Cards */}
@@ -80,7 +83,7 @@ export function SourceWorkspacePanel({
               <FolderOpen size={18} />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Workspace</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{t("workspace")}</p>
               <p className="text-lg font-bold text-slate-900">{workspaceName}</p>
             </div>
           </CardContent>
@@ -91,7 +94,7 @@ export function SourceWorkspacePanel({
               <FileText size={18} />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Source Count</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{t("sourceCount")}</p>
               <p className="text-lg font-bold text-slate-900">{documents.length}</p>
             </div>
           </CardContent>
@@ -124,7 +127,7 @@ export function SourceWorkspacePanel({
                   <TableCell colSpan={3} className="h-24">
                     <div className="flex flex-col items-center justify-center gap-1.5 text-slate-400">
                       <FileText size={24} strokeWidth={1.5} />
-                      <p className="text-sm">No source documents uploaded yet</p>
+                      <p className="text-sm">{t("noDocs")}</p>
                     </div>
                   </TableCell>
                 </TableRow>

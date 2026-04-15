@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Database } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { getApiUrl } from "@/lib/api";
 
@@ -58,21 +59,23 @@ export function LoginForm() {
     router.refresh();
   }
 
+  const t = useTranslations("login");
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2.5 mb-2">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white">
           <Database size={18} />
         </div>
-        <span className="text-lg font-bold text-slate-900 tracking-tight">LLM Wiki</span>
+        <span className="text-lg font-bold text-slate-900 tracking-tight">{t("title")}</span>
       </div>
 
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          {mode === "login" ? "Welcome back" : "Create your account"}
+          {mode === "login" ? t("welcome") : t("register")}
         </h1>
         <p className="mt-1.5 text-sm text-slate-500">
-          Enterprise compiled knowledge vault with agent operating plane.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -80,7 +83,7 @@ export function LoginForm() {
         {mode === "register" && (
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700" htmlFor="displayName">
-              Display Name
+              {t("displayName")}
             </label>
             <input
               id="displayName"
@@ -95,8 +98,8 @@ export function LoginForm() {
         )}
 
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-slate-700" htmlFor="email">
-            Email
+            <label className="block text-sm font-medium text-slate-700" htmlFor="email">
+            {t("email")}
           </label>
           <input
             id="email"
@@ -112,11 +115,11 @@ export function LoginForm() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="block text-sm font-medium text-slate-700" htmlFor="password">
-              Password
+              {t("password")}
             </label>
             {mode === "login" && (
               <button type="button" className="text-xs font-medium text-blue-600 hover:text-blue-700">
-                Forgot password?
+                {t("forgot")}
               </button>
             )}
           </div>
@@ -143,7 +146,7 @@ export function LoginForm() {
           disabled={submitting}
           className="w-full py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
         >
-          {submitting ? "Signing in..." : mode === "login" ? "Sign In" : "Create Account"}
+          {submitting ? t("signing") : mode === "login" ? t("signin") : t("createAccount")}
         </button>
       </form>
 
@@ -154,7 +157,7 @@ export function LoginForm() {
               <div className="w-full border-t border-slate-200" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-3 text-slate-500">Or continue with</span>
+              <span className="bg-white px-3 text-slate-500">{t("or")}</span>
             </div>
           </div>
 
@@ -180,24 +183,16 @@ export function LoginForm() {
       <p className="text-center text-sm text-slate-500">
         {mode === "login" ? (
           <>
-            Don&apos;t have an account?{" "}
-            <button
-              type="button"
-              onClick={() => setMode("register")}
-              className="font-semibold text-blue-600 hover:text-blue-700"
-            >
-              Sign up
+            {t("noAccount")}{" "}
+            <button type="button" onClick={() => setMode("register")} className="font-semibold text-blue-600 hover:text-blue-700">
+              {t("signup")}
             </button>
           </>
         ) : (
           <>
-            Already have an account?{" "}
-            <button
-              type="button"
-              onClick={() => setMode("login")}
-              className="font-semibold text-blue-600 hover:text-blue-700"
-            >
-              Sign in
+            {t("hasAccount")}{" "}
+            <button type="button" onClick={() => setMode("login")} className="font-semibold text-blue-600 hover:text-blue-700">
+              {t("signinLink")}
             </button>
           </>
         )}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Minus, Maximize, Network, Plus, X, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { getApiUrl } from "@/lib/api";
 import { GraphCanvas } from "@/components/graph-canvas";
@@ -81,14 +82,16 @@ export function GraphPanel({ workspaceId, workspaceName }: { workspaceId: string
   const handleZoomOut = () => graphRef.current?.zoom(graphRef.current.zoom() / 1.4, 300);
   const handleZoomReset = () => graphRef.current?.zoomToFit(350, sheetOpen ? 72 : 40);
 
+  const t = useTranslations("graph");
+
   if (loading) {
-    return <div className="flex flex-col items-center justify-center py-32 gap-3 text-slate-400"><Loader2 size={28} className="animate-spin" /><p className="text-sm">Loading graph…</p></div>;
+    return <div className="flex flex-col items-center justify-center py-32 gap-3 text-slate-400"><Loader2 size={28} className="animate-spin" /><p className="text-sm">{t("loading")}</p></div>;
   }
   if (error) {
     return <Card className="shadow-sm"><CardContent className="flex flex-col items-center justify-center py-16 gap-3"><AlertCircle size={28} className="text-red-400" /><p className="text-sm text-red-600">{error}</p><button onClick={loadGraph} className="text-sm text-blue-600 hover:underline">Retry</button></CardContent></Card>;
   }
   if (!data || data.nodes.length === 0) {
-    return <Card className="shadow-sm"><CardContent className="flex flex-col items-center justify-center py-20 gap-3"><Network size={36} strokeWidth={1.2} className="text-slate-300" /><p className="text-sm font-medium text-slate-500">No graph data in this workspace</p><p className="text-xs text-slate-400 max-w-sm text-center">Upload source documents and run the compiler pipeline to generate entities, claims, and relations that populate the knowledge graph.</p></CardContent></Card>;
+    return <Card className="shadow-sm"><CardContent className="flex flex-col items-center justify-center py-20 gap-3"><Network size={36} strokeWidth={1.2} className="text-slate-300" /><p className="text-sm font-medium text-slate-500">{t("noData")}</p><p className="text-xs text-slate-400 max-w-sm text-center">{t("noDataHint")}</p></CardContent></Card>;
   }
 
   const s = data.summary;
@@ -98,19 +101,19 @@ export function GraphPanel({ workspaceId, workspaceName }: { workspaceId: string
       {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="secondary" className="gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> {s.entity_count} entities</Badge>
-          {showClaims && <Badge variant="secondary" className="gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> {s.claim_count} claims</Badge>}
-          {showDocuments && <Badge variant="secondary" className="gap-1"><span className="w-2 h-2 rounded-full bg-slate-500 inline-block" /> {s.document_count} documents</Badge>}
-          <Badge variant="secondary">{data.edges.length} edges</Badge>
-          {s.truncated && <Badge variant="destructive">Truncated</Badge>}
+          <Badge variant="secondary" className="gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> {s.entity_count} {t("entities")}</Badge>
+          {showClaims && <Badge variant="secondary" className="gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> {s.claim_count} {t("claims")}</Badge>}
+          {showDocuments && <Badge variant="secondary" className="gap-1"><span className="w-2 h-2 rounded-full bg-slate-500 inline-block" /> {s.document_count} {t("documents")}</Badge>}
+          <Badge variant="secondary">{data.edges.length} {t("edges")}</Badge>
+          {s.truncated && <Badge variant="destructive">{t("truncated")}</Badge>}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <FilterToggle label="Claims" active={showClaims} onChange={setShowClaims} />
           <FilterToggle label="Documents" active={showDocuments} onChange={setShowDocuments} />
           <FilterToggle label="References" active={showReferences} onChange={setShowReferences} />
           <div className="flex items-center gap-1.5 ml-2">
-            <input type="text" value={focusDocId} onChange={(e) => setFocusDocId(e.target.value.trim())} placeholder="Focus document ID" className="h-7 w-40 rounded-lg border border-slate-200 bg-white px-2.5 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-            {focusDocId && <button type="button" onClick={() => setFocusDocId("")} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>}
+            <input type="text" value={focusDocId} onChange={(e) => setFocusDocId(e.target.value.trim())} placeholder={t("focusDoc")} className="h-7 w-40 rounded-lg border border-slate-200 bg-white px-2.5 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+            {focusDocId && <button type="button" onClick={() => setFocusDocId("")} className="text-xs text-slate-400 hover:text-slate-600">{t("clear")}</button>}
           </div>
         </div>
       </div>
@@ -132,9 +135,9 @@ export function GraphPanel({ workspaceId, workspaceName }: { workspaceId: string
             />
             {/* Legend */}
             <div className="absolute bottom-3 left-3 flex items-center gap-3 bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-xs text-slate-500 border border-slate-100 shadow-sm">
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Entity</span>
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500 rotate-45 scale-75" /> Claim</span>
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-slate-500" /> Document</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> {t("entity")}</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500 rotate-45 scale-75" /> {t("claim")}</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-slate-500" /> {t("document")}</span>
             </div>
             {/* Zoom Controls */}
             <div className="absolute bottom-3 right-3 flex flex-col gap-1">
@@ -148,7 +151,7 @@ export function GraphPanel({ workspaceId, workspaceName }: { workspaceId: string
           {sheetOpen && (
             <div className="w-80 shrink-0 border-l border-slate-200 bg-white p-5 overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-900">{selectedNode ? "Node" : "Edge"}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{selectedNode ? t("node") : t("edge")}</h3>
                 <Button variant="ghost" size="icon-xs" onClick={() => { setSelectedNode(null); setSelectedEdge(null); }}><X size={14} /></Button>
               </div>
 
@@ -165,12 +168,12 @@ export function GraphPanel({ workspaceId, workspaceName }: { workspaceId: string
                   ))}
                   {selectedNode.type === "document" && (
                     <div className="pt-2 border-t border-slate-100 space-y-2">
-                      <Link href={`/vault/${selectedNode.ref_id}`} className="flex items-center justify-center gap-1.5 w-full h-7 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"><ExternalLink size={13} /> Open in Vault</Link>
-                      <button onClick={() => { setFocusDocId(selectedNode.ref_id); setSelectedNode(null); }} className="flex items-center justify-center gap-1.5 w-full h-7 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-all">Focus on this document</button>
+                      <Link href={`/vault/${selectedNode.ref_id}`} className="flex items-center justify-center gap-1.5 w-full h-7 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"><ExternalLink size={13} /> {t("openVault")}</Link>
+                      <button onClick={() => { setFocusDocId(selectedNode.ref_id); setSelectedNode(null); }} className="flex items-center justify-center gap-1.5 w-full h-7 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-all">{t("focusThis")}</button>
                     </div>
                   )}
                   {selectedNode.type === "entity" && selectedNode.path && (
-                    <Link href={`/search?q=${encodeURIComponent(selectedNode.label)}`} className="flex items-center justify-center gap-1.5 w-full h-7 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"><ExternalLink size={13} /> Search Wiki</Link>
+                    <Link href={`/search?q=${encodeURIComponent(selectedNode.label)}`} className="flex items-center justify-center gap-1.5 w-full h-7 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"><ExternalLink size={13} /> {t("searchWiki")}</Link>
                   )}
                 </div>
               )}

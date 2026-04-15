@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CloudUpload, FileText } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { getApiUrl } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
@@ -65,10 +66,12 @@ export function SourceUploadForm({ workspaceId }: { workspaceId: string }) {
     router.refresh();
   }
 
+  const t = useTranslations("sources");
+
   return (
     <Card className="shadow-sm ring-slate-200/80">
       <CardHeader>
-        <CardTitle>Upload Source</CardTitle>
+        <CardTitle>{t("upload")}</CardTitle>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -95,10 +98,10 @@ export function SourceUploadForm({ workspaceId }: { workspaceId: string }) {
               <>
                 <CloudUpload size={28} className="text-slate-400" />
                 <p className="text-sm font-medium text-slate-600">
-                  Drag & drop a file, or <span className="text-blue-600">browse</span>
+                  {t("dragDrop")} <span className="text-blue-600">{t("browse")}</span>
                 </p>
                 <p className="text-xs text-slate-400">
-                  PDF, DOCX, XLSX, CSV, Markdown, HTML
+                  {t("formats")}
                 </p>
               </>
             )}
@@ -113,16 +116,16 @@ export function SourceUploadForm({ workspaceId }: { workspaceId: string }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700" htmlFor="upload-title">Title</label>
+              <label className="text-sm font-medium text-slate-700" htmlFor="upload-title">{t("titleField")}</label>
               <Input
                 id="upload-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Optional custom title"
+                placeholder={t("titlePlaceholder")}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700" htmlFor="upload-path">Vault Path</label>
+              <label className="text-sm font-medium text-slate-700" htmlFor="upload-path">{t("vaultPath")}</label>
               <Input
                 id="upload-path"
                 value={sourcePath}
@@ -145,7 +148,7 @@ export function SourceUploadForm({ workspaceId }: { workspaceId: string }) {
               disabled={submitting || !file}
               className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? "Uploading…" : "Upload Source"}
+              {submitting ? t("uploading") : t("uploadBtn")}
             </Button>
           </div>
         </form>
