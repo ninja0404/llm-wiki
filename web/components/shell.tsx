@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Activity, Bot, Database, FileText, FolderTree, Globe, LogOut, Network, Search, Settings, LucideIcon } from "lucide-react";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
-import { t, getLocale, setLocale, initLocale, Locale } from "@/lib/i18n";
 
 interface NavItem {
   href: string;
@@ -15,20 +15,18 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/sources", titleKey: "nav.sources", icon: FileText },
-  { href: "/vault", titleKey: "nav.vault", icon: FolderTree },
-  { href: "/search", titleKey: "nav.search", icon: Search },
-  { href: "/graph", titleKey: "nav.graph", icon: Network },
-  { href: "/runs", titleKey: "nav.runs", icon: Bot },
-  { href: "/activity", titleKey: "nav.activity", icon: Activity },
-  { href: "/settings", titleKey: "nav.settings", icon: Settings },
+  { href: "/sources", titleKey: "sources", icon: FileText },
+  { href: "/vault", titleKey: "vault", icon: FolderTree },
+  { href: "/search", titleKey: "search", icon: Search },
+  { href: "/graph", titleKey: "graph", icon: Network },
+  { href: "/runs", titleKey: "runs", icon: Bot },
+  { href: "/activity", titleKey: "activity", icon: Activity },
+  { href: "/settings", titleKey: "settings", icon: Settings },
 ];
 
 function SidebarNav() {
   const pathname = usePathname();
-  const [, forceUpdate] = useState(0);
-
-  useEffect(() => { initLocale(); forceUpdate((n) => n + 1); }, []);
+  const t = useTranslations("nav");
 
   return (
     <nav className="flex flex-col gap-0.5 px-3 mt-1">
@@ -53,29 +51,26 @@ function SidebarNav() {
 }
 
 function LanguageToggle() {
-  const [locale, setCurrentLocale] = useState<Locale>("en");
-  const [, forceUpdate] = useState(0);
-
-  useEffect(() => { setCurrentLocale(initLocale()); }, []);
+  const t = useTranslations("common");
 
   function toggle() {
-    const next: Locale = locale === "en" ? "zh" : "en";
-    setLocale(next);
-    setCurrentLocale(next);
-    forceUpdate((n) => n + 1);
+    const current = document.cookie.match(/llm-wiki-locale=(\w+)/)?.[1] ?? "en";
+    const next = current === "en" ? "zh" : "en";
+    document.cookie = `llm-wiki-locale=${next}; path=/; max-age=${60 * 60 * 24 * 365}`;
     window.location.reload();
   }
 
   return (
     <button onClick={toggle} className="flex items-center gap-2 w-full px-6 py-2 text-xs font-medium text-slate-400 hover:text-slate-600 transition-all">
       <Globe size={13} />
-      <span>{locale === "en" ? "中文" : "English"}</span>
+      <span>{t("language")}</span>
     </button>
   );
 }
 
 function LogoutButton() {
   const router = useRouter();
+  const t = useTranslations("nav");
 
   function handleLogout() {
     document.cookie = "llm_wiki_session=; path=/; max-age=0";
@@ -84,17 +79,16 @@ function LogoutButton() {
   }
 
   return (
-    <button
-      onClick={handleLogout}
-      className="flex items-center gap-2.5 w-full px-6 py-2.5 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all"
-    >
+    <button onClick={handleLogout} className="flex items-center gap-2.5 w-full px-6 py-2.5 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all">
       <LogOut size={15} />
-      <span>{t("nav.signout")}</span>
+      <span>{t("signout")}</span>
     </button>
   );
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const t = useTranslations("nav");
+
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 border-r border-slate-200 bg-white flex flex-col shrink-0">
@@ -106,9 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mt-auto border-t border-slate-100">
           <LanguageToggle />
           <LogoutButton />
-          <div className="px-4 py-2 text-xs text-slate-400">
-            {t("nav.tagline")}
-          </div>
+          <div className="px-4 py-2 text-xs text-slate-400">{t("tagline")}</div>
         </div>
       </aside>
       <main className="flex-1 overflow-auto bg-slate-50">{children}</main>
