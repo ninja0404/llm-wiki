@@ -91,7 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-56 border-r border-slate-200 bg-white flex flex-col shrink-0">
+      <aside className="w-56 border-r border-slate-200 bg-white flex flex-col shrink-0 h-screen sticky top-0">
         <div className="flex items-center gap-2 px-5 py-5 text-sm font-bold text-slate-900 tracking-tight">
           <Database size={18} />
           <span>LLM Wiki</span>
