@@ -204,10 +204,10 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
           {settings ? (
             <form className="space-y-5" onSubmit={handleSaveSettings}>
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">LLM Configuration</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t("llmConfig")}</p>
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Provider</label>
+                    <label className="text-sm font-medium text-slate-700">{t("provider")}</label>
                     <ProviderSelect
                       value={settings.llm_provider}
                       options={LLM_PROVIDERS}
@@ -219,26 +219,26 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Model</label>
+                      <label className="text-sm font-medium text-slate-700">{t("model")}</label>
                       <Input value={settings.llm_model} onChange={(e) => setSettings({ ...settings, llm_model: e.target.value })} placeholder="gpt-4.1-mini" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">API Key</label>
+                      <label className="text-sm font-medium text-slate-700">{t("apiKey")}</label>
                       <Input type="password" value={settings.llm_api_key} onChange={(e) => setSettings({ ...settings, llm_api_key: e.target.value })} placeholder="sk-..." />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Base URL</label>
-                    <Input value={settings.llm_base_url} onChange={(e) => setSettings({ ...settings, llm_base_url: e.target.value })} placeholder="Auto-filled from provider selection" />
+                    <label className="text-sm font-medium text-slate-700">{t("baseUrl")}</label>
+                    <Input value={settings.llm_base_url} onChange={(e) => setSettings({ ...settings, llm_base_url: e.target.value })} placeholder={t("baseUrl")} />
                   </div>
                 </div>
               </div>
 
               <div className="border-t border-slate-100 pt-5">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Embedding Configuration</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t("embeddingConfig")}</p>
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Provider</label>
+                    <label className="text-sm font-medium text-slate-700">{t("provider")}</label>
                     <ProviderSelect
                       value={settings.embedding_provider}
                       options={EMBEDDING_PROVIDERS}
@@ -250,71 +250,71 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Model</label>
+                      <label className="text-sm font-medium text-slate-700">{t("model")}</label>
                       <Input value={settings.embedding_model} onChange={(e) => setSettings({ ...settings, embedding_model: e.target.value })} placeholder="text-embedding-3-small" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">API Key</label>
+                      <label className="text-sm font-medium text-slate-700">{t("apiKey")}</label>
                       <Input type="password" value={settings.embedding_api_key} onChange={(e) => setSettings({ ...settings, embedding_api_key: e.target.value })} placeholder="sk-..." />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Base URL</label>
-                    <Input value={settings.embedding_base_url} onChange={(e) => setSettings({ ...settings, embedding_base_url: e.target.value })} placeholder="Auto-filled from provider selection" />
+                    <label className="text-sm font-medium text-slate-700">{t("baseUrl")}</label>
+                    <Input value={settings.embedding_base_url} onChange={(e) => setSettings({ ...settings, embedding_base_url: e.target.value })} placeholder={t("baseUrl")} />
                   </div>
                 </div>
               </div>
               <div className="border-t border-slate-100 pt-5">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Compiler Rules</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t("compilerRules")}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Max Entities</label>
+                    <label className="text-sm font-medium text-slate-700">{t("maxEntities")}</label>
                     <Input type="number" min={5} max={50} value={settings.compiler_rules.max_entities} onChange={(e) => setSettings({ ...settings, compiler_rules: { ...settings.compiler_rules, max_entities: parseInt(e.target.value) || 20 } })} />
-                    <p className="text-xs text-slate-400">5–50, LLM extracts up to this many entities per document</p>
+                    <p className="text-xs text-slate-400">{t("maxEntitiesDesc")}</p>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Min Confidence</label>
+                    <label className="text-sm font-medium text-slate-700">{t("minConfidence")}</label>
                     <Input type="number" min={0} max={1} step={0.05} value={settings.compiler_rules.min_confidence} onChange={(e) => setSettings({ ...settings, compiler_rules: { ...settings.compiler_rules, min_confidence: parseFloat(e.target.value) || 0.5 } })} />
-                    <p className="text-xs text-slate-400">0–1, claims below this confidence are filtered out</p>
+                    <p className="text-xs text-slate-400">{t("minConfidenceDesc")}</p>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Text Truncation Limit</label>
+                    <label className="text-sm font-medium text-slate-700">{t("textTruncation")}</label>
                     <Input type="number" min={4000} max={30000} step={1000} value={settings.compiler_rules.text_truncation_limit} onChange={(e) => setSettings({ ...settings, compiler_rules: { ...settings.compiler_rules, text_truncation_limit: parseInt(e.target.value) || 12000 } })} />
-                    <p className="text-xs text-slate-400">Characters sent to LLM per document</p>
+                    <p className="text-xs text-slate-400">{t("textTruncationDesc")}</p>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Custom Instructions</label>
-                    <Input value={settings.compiler_rules.custom_instructions} onChange={(e) => setSettings({ ...settings, compiler_rules: { ...settings.compiler_rules, custom_instructions: e.target.value } })} placeholder="e.g. Focus on technical entities" />
-                    <p className="text-xs text-slate-400">Appended to the LLM extraction prompt</p>
+                    <label className="text-sm font-medium text-slate-700">{t("customInstructions")}</label>
+                    <Input value={settings.compiler_rules.custom_instructions} onChange={(e) => setSettings({ ...settings, compiler_rules: { ...settings.compiler_rules, custom_instructions: e.target.value } })} placeholder={t("customInstructions")} />
+                    <p className="text-xs text-slate-400">{t("customInstructionsDesc")}</p>
                   </div>
                 </div>
               </div>
 
               <div className="border-t border-slate-100 pt-5">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Search Rules</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t("searchRules")}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Default Result Limit</label>
+                    <label className="text-sm font-medium text-slate-700">{t("defaultLimit")}</label>
                     <Input type="number" min={5} max={50} value={settings.search_rules.default_limit} onChange={(e) => setSettings({ ...settings, search_rules: { ...settings.search_rules, default_limit: parseInt(e.target.value) || 20 } })} />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Graph Boost Weight</label>
+                    <label className="text-sm font-medium text-slate-700">{t("graphBoost")}</label>
                     <Input type="number" min={0} max={1} step={0.05} value={settings.search_rules.graph_boost_weight} onChange={(e) => setSettings({ ...settings, search_rules: { ...settings.search_rules, graph_boost_weight: parseFloat(e.target.value) || 0.15 } })} />
-                    <p className="text-xs text-slate-400">0–1, how much graph connectivity boosts ranking</p>
+                    <p className="text-xs text-slate-400">{t("graphBoostDesc")}</p>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Min Score Threshold</label>
+                    <label className="text-sm font-medium text-slate-700">{t("minScore")}</label>
                     <Input type="number" min={0} max={1} step={0.05} value={settings.search_rules.min_score} onChange={(e) => setSettings({ ...settings, search_rules: { ...settings.search_rules, min_score: parseFloat(e.target.value) || 0 } })} />
-                    <p className="text-xs text-slate-400">Filter results below this score</p>
+                    <p className="text-xs text-slate-400">{t("minScoreDesc")}</p>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-slate-700">Enable Semantic Search</label>
+                    <label className="text-sm font-medium text-slate-700">{t("enableSemantic")}</label>
                     <div className="flex items-center gap-2 h-8">
                       <button type="button" onClick={() => setSettings({ ...settings, search_rules: { ...settings.search_rules, enable_semantic: !settings.search_rules.enable_semantic } })}
                         className={`relative w-10 h-5 rounded-full transition-colors ${settings.search_rules.enable_semantic ? "bg-blue-600" : "bg-slate-300"}`}>
                         <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${settings.search_rules.enable_semantic ? "translate-x-5" : ""}`} />
                       </button>
-                      <span className="text-sm text-slate-600">{settings.search_rules.enable_semantic ? "Enabled" : "Disabled"}</span>
+                      <span className="text-sm text-slate-600">{settings.search_rules.enable_semantic ? t("enabled") : t("disabled")}</span>
                     </div>
                   </div>
                 </div>
@@ -347,11 +347,11 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
           {/* Create Token */}
           <div className="flex items-end gap-3">
             <div className="flex-1 space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Token Name</label>
-              <Input value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} placeholder="e.g. Claude Agent" />
+              <label className="text-sm font-medium text-slate-700">{t("tokenName")}</label>
+              <Input value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} placeholder={t("tokenName")} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Scope</label>
+              <label className="text-sm font-medium text-slate-700">{t("scope")}</label>
               <div className="flex rounded-lg border border-slate-200 overflow-hidden h-8">
                 {(["read", "write", "admin"] as const).map((s) => (
                   <button
@@ -398,7 +398,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
               <TableRow className="bg-slate-50/80">
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</TableHead>
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prefix</TableHead>
-                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scope</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t("scope")}</TableHead>
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Last Used</TableHead>
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider w-16" />
               </TableRow>

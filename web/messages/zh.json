@@ -153,7 +153,13 @@
     "workspaceId": "工作区 ID",
     "authHeader": "认证头",
     "tokenScopes": "Token 权限范围",
-    "availableTools": "可用 MCP 工具"
+    "availableTools": "可用 MCP 工具",
+    "maxEntitiesDesc": "5–50，LLM 从每个文档中最多提取此数量的实体",
+    "minConfidenceDesc": "0–1，低于此置信度的声明会被过滤",
+    "textTruncationDesc": "发送给 LLM 的每个文档的字符数上限",
+    "customInstructionsDesc": "附加到 LLM 提取 prompt 的自定义指令",
+    "graphBoostDesc": "0–1，图谱连接度对搜索排名的加权系数",
+    "minScoreDesc": "过滤低于此分数的搜索结果"
   },
   "activity": {
     "title": "活动 / 版本历史",

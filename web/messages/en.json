@@ -153,7 +153,13 @@
     "workspaceId": "Workspace ID",
     "authHeader": "Auth Header",
     "tokenScopes": "Token Scopes",
-    "availableTools": "Available MCP Tools"
+    "availableTools": "Available MCP Tools",
+    "maxEntitiesDesc": "5–50, LLM extracts up to this many entities per document",
+    "minConfidenceDesc": "0–1, claims below this confidence are filtered out",
+    "textTruncationDesc": "Characters sent to LLM per document",
+    "customInstructionsDesc": "Appended to the LLM extraction prompt",
+    "graphBoostDesc": "0–1, how much graph connectivity boosts ranking",
+    "minScoreDesc": "Filter results below this score"
   },
   "activity": {
     "title": "Activity / Revisions",
