@@ -52,12 +52,13 @@ function SidebarNav() {
 
 function LanguageToggle() {
   const t = useTranslations("common");
+  const router = useRouter();
 
   function toggle() {
     const current = document.cookie.match(/llm-wiki-locale=(\w+)/)?.[1] ?? "en";
     const next = current === "en" ? "zh" : "en";
     document.cookie = `llm-wiki-locale=${next}; path=/; max-age=${60 * 60 * 24 * 365}`;
-    window.location.reload();
+    router.refresh();
   }
 
   return (
