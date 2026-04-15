@@ -414,18 +414,18 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
                   </TableCell>
                 </TableRow>
               ) : (
-                tokens.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-medium text-slate-700">{t.name}</TableCell>
-                    <TableCell className="font-mono text-xs text-slate-500">{t.token_prefix}…</TableCell>
+                tokens.map((tk) => (
+                  <TableRow key={tk.id}>
+                    <TableCell className="font-medium text-slate-700">{tk.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-slate-500">{tk.token_prefix}…</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${scopeColors[t.scope] ?? "bg-slate-100 text-slate-600"}`}>
-                        {t.scope}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${scopeColors[tk.scope] ?? "bg-slate-100 text-slate-600"}`}>
+                        {tk.scope}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-500">{t.last_used_at ? new Date(t.last_used_at).toLocaleDateString() : t("never")}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{tk.last_used_at ? new Date(tk.last_used_at).toLocaleDateString() : t("never")}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon-xs" onClick={() => handleRevoke(t.id)} title="Revoke token">
+                      <Button variant="ghost" size="icon-xs" onClick={() => handleRevoke(tk.id)} title="Revoke token">
                         <Trash2 size={14} className="text-red-500" />
                       </Button>
                     </TableCell>
