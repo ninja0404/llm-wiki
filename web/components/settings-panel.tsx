@@ -197,8 +197,8 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
       {/* Compiler Settings Form */}
       <Card className="shadow-sm ring-slate-200/80">
         <CardHeader>
-          <CardTitle>{{t("compiler")}}</CardTitle>
-          <CardDescription>LLM and embedding provider configuration for this workspace.</CardDescription>
+          <CardTitle>{t("compiler")}</CardTitle>
+          <CardDescription>{t("compilerDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {settings ? (
