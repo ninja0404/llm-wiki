@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, Bot, Database, FileText, FolderTree, Globe, LogOut, Network, Search, Settings, LucideIcon } from "lucide-react";
-import { ReactNode } from "react";
+import { Activity, Bot, Database, FileText, FolderTree, Globe, LogOut, Network, Search, Settings, User, LucideIcon } from "lucide-react";
+import { ReactNode, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
@@ -68,6 +68,28 @@ function LanguageToggle() {
   );
 }
 
+function UserInfo() {
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/v1/auth/me`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .catch(() => null)
+      .then((d) => { if (d?.data?.email) setEmail(d.data.email); });
+  }, []);
+
+  if (!email) return null;
+
+  return (
+    <div className="flex items-center gap-2 px-6 py-2">
+      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-500 shrink-0">
+        <User size={13} />
+      </div>
+      <span className="text-xs text-slate-500 truncate">{email}</span>
+    </div>
+  );
+}
+
 function LogoutButton() {
   const router = useRouter();
   const t = useTranslations("nav");
@@ -98,6 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <SidebarNav />
         <div className="mt-auto border-t border-slate-100">
+          <UserInfo />
           <LanguageToggle />
           <LogoutButton />
           <div className="px-4 py-2 text-xs text-slate-400">{t("tagline")}</div>
