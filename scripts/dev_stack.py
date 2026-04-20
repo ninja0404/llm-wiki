@@ -27,7 +27,7 @@ def main() -> int:
         ("compiler-worker", spawn("compiler-worker", [sys.executable, "-m", "services.compiler_worker.app.main"])),
         ("mcp-service", spawn("mcp-service", [sys.executable, "-m", "uvicorn", "services.mcp_service.app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8080"])),
         ("converter-service", spawn("converter-service", [sys.executable, "-m", "uvicorn", "services.converter_service.app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8090"])),
-        ("web", spawn("web", ["bun", "--cwd", "web", "dev"]))
+        ("web", spawn("web", ["pnpm", "--dir", "web", "dev"]))
     ]
 
     try:

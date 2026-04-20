@@ -5,7 +5,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from llm_wiki_core.security import AuthContext
-from services.platform_api.app.core.deps import require_workspace_access
+from services.platform_api.app.core.deps import get_workspace_conn, require_workspace_access
 from services.platform_api.app.main import app
 
 
@@ -47,18 +47,6 @@ class FakeConnection:
         return "OK"
 
 
-class FakePool:
-    def __init__(self) -> None:
-        self.connection = FakeConnection()
-
-    def acquire(self) -> FakeConnection:
-        return self.connection
-
-
-async def fake_pool() -> FakePool:
-    return FakePool()
-
-
 def test_upload_source_route(monkeypatch) -> None:
     from services.platform_api.app import main as main_module
     from services.platform_api.app.api.routes import documents as documents_module
@@ -66,11 +54,12 @@ def test_upload_source_route(monkeypatch) -> None:
     logged: list[dict[str, Any]] = []
     queued: list[str] = []
     stored: list[tuple[str, bytes, str]] = []
+    fake_connection = FakeConnection()
 
     async def noop() -> None:
         return None
 
-    async def fake_enqueue(run_id: str) -> None:
+    async def fake_enqueue(run_id: str, workspace_id: str, idempotency_key: str | None = None) -> bool:
         queued.append(run_id)
 
     async def fake_log_activity(**kwargs: Any) -> None:
@@ -79,9 +68,8 @@ def test_upload_source_route(monkeypatch) -> None:
     def fake_put_bytes(key: str, data: bytes, content_type: str) -> None:
         stored.append((key, data, content_type))
 
-    monkeypatch.setattr(documents_module, "get_db_pool", fake_pool)
     monkeypatch.setattr(documents_module, "enqueue_run", fake_enqueue)
-    monkeypatch.setattr(documents_module, "log_activity", fake_log_activity)
+    monkeypatch.setattr(documents_module, "record_activity", fake_log_activity)
     monkeypatch.setattr(documents_module, "put_bytes", fake_put_bytes)
     monkeypatch.setattr(main_module, "init_db_pool", noop)
     monkeypatch.setattr(main_module, "close_db_pool", noop)
@@ -95,6 +83,10 @@ def test_upload_source_route(monkeypatch) -> None:
         workspace_roles={workspace_id: "owner"},
         token_scope="admin",
     )
+    async def override_workspace_conn(workspace_id: str):
+        yield fake_connection
+
+    app.dependency_overrides[get_workspace_conn] = override_workspace_conn
 
     client = TestClient(app)
     response = client.post(

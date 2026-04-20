@@ -2,8 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from ...core.deps import AuthContext, require_workspace_access
-from llm_wiki_core.db import get_db_pool
+from ...core.deps import AuthContext, get_workspace_conn, require_workspace_access
 
 
 router = APIRouter(tags=["activity"])
@@ -13,9 +12,9 @@ router = APIRouter(tags=["activity"])
 async def list_activity(
     workspace_id: str,
     auth: Annotated[AuthContext, Depends(require_workspace_access)],
+    connection=Depends(get_workspace_conn),
 ) -> dict:
-    pool = await get_db_pool()
-    rows = await pool.fetch(
+    rows = await connection.fetch(
         """
         SELECT ae.id::text AS id, ae.actor_type::text AS actor_type, ae.actor_id, ae.event_type,
                ae.document_id::text AS document_id, ae.run_id::text AS run_id, ae.payload, ae.created_at,

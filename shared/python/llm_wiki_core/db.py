@@ -60,7 +60,16 @@ async def close_db_pool() -> None:
 
 
 @asynccontextmanager
-async def acquire() -> asyncpg.Connection:
+async def acquire(workspace_id: str | None = None):
     pool = await get_db_pool()
     async with pool.acquire() as connection:
-        yield connection
+        if not workspace_id:
+            yield connection
+            return
+
+        async with connection.transaction():
+            await connection.execute(
+                "SELECT set_config('app.workspace_id', $1, true)",
+                workspace_id,
+            )
+            yield connection

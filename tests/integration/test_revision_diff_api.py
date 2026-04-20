@@ -29,6 +29,17 @@ async def fake_pool() -> FakePool:
     return FakePool()
 
 
+class FakeAcquire:
+    def __init__(self) -> None:
+        self.pool = FakePool()
+
+    async def __aenter__(self) -> FakePool:
+        return self.pool
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        return None
+
+
 def test_revision_diff_api(monkeypatch) -> None:
     from services.platform_api.app import main as main_module
     from services.platform_api.app.api.routes import revisions as revisions_module
@@ -36,7 +47,7 @@ def test_revision_diff_api(monkeypatch) -> None:
     async def noop() -> None:
         return None
 
-    monkeypatch.setattr(revisions_module, "get_db_pool", fake_pool)
+    monkeypatch.setattr(revisions_module, "acquire", lambda workspace_id: FakeAcquire())
     monkeypatch.setattr(main_module, "init_db_pool", noop)
     monkeypatch.setattr(main_module, "close_db_pool", noop)
     monkeypatch.setattr(main_module, "close_redis", noop)

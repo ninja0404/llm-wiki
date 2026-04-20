@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, FolderOpen } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { getApiUrl } from "@/lib/api";
+import { clientApiFetch } from "@/lib/api";
 import { RunStatusList } from "@/components/run-status-list";
 import { SourceUploadForm } from "@/components/source-upload-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
@@ -59,12 +59,12 @@ export function SourceWorkspacePanel({
     let disposed = false;
     async function refreshWorkspaceData() {
       const [docsRes, runsRes] = await Promise.all([
-        fetch(`${getApiUrl()}/v1/workspaces/${workspaceId}/documents?kind=source`, { credentials: "include", cache: "no-store" }),
-        fetch(`${getApiUrl()}/v1/workspaces/${workspaceId}/runs`, { credentials: "include", cache: "no-store" }),
+        clientApiFetch<{ data: SourceDocumentSummary[] }>(`/v1/workspaces/${workspaceId}/documents?kind=source`).catch(() => ({ data: [] })),
+        clientApiFetch<{ data: RunSummary[] }>(`/v1/workspaces/${workspaceId}/runs`).catch(() => ({ data: [] })),
       ]);
       if (disposed) return;
-      if (docsRes.ok) { const p = await docsRes.json().catch(() => ({ data: [] })); if (!disposed) setDocuments(p.data ?? []); }
-      if (runsRes.ok) { const p = await runsRes.json().catch(() => ({ data: [] })); if (!disposed) setRuns(p.data ?? []); }
+      if (!disposed) setDocuments(docsRes.data ?? []);
+      if (!disposed) setRuns(runsRes.data ?? []);
     }
     if (!hasActiveWork) return () => { disposed = true; };
     const timer = window.setInterval(refreshWorkspaceData, 2500);

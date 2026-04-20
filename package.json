@@ -1,21 +1,22 @@
 {
   "name": "llm-wiki-vnext",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "python3 scripts/dev_stack.py",
     "dev:check": "python3 scripts/check_local_stack.py",
     "db:init": "python3 scripts/init_local_db.py",
     "db:reset": "python3 scripts/init_local_db.py --reset",
-    "dev:web": "cd web && bun dev",
+    "dev:web": "pnpm --dir web dev",
     "dev:platform-api": "uvicorn services.platform_api.app.main:app --reload --host 0.0.0.0 --port 8000",
     "dev:compiler-worker": "python -m services.compiler_worker.app.main",
     "dev:mcp-service": "uvicorn services.mcp_service.app.main:app --reload --host 0.0.0.0 --port 8080",
     "dev:converter-service": "uvicorn services.converter_service.app.main:app --reload --host 0.0.0.0 --port 8090",
-    "build:web": "cd web && bun run build",
+    "build:web": "pnpm --dir web run build",
     "test:python": "pytest tests/unit tests/integration",
     "test": "pytest tests/unit tests/integration",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
-    "lint:web": "cd web && bun run lint"
+    "lint:web": "pnpm --dir web run lint"
   }
 }

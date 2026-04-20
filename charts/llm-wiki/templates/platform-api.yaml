@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-platform-api
+  labels:
+    app: {{ .Release.Name }}-platform-api
+spec:
+  replicas: {{ .Values.replicaCount.platformApi }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-platform-api
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-platform-api
+    spec:
+      containers:
+        - name: platform-api
+          image: "{{ .Values.image.platformApi.repository }}:{{ .Values.image.platformApi.tag }}"
+          imagePullPolicy: {{ .Values.image.platformApi.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_ENV
+              value: {{ .Values.env.APP_ENV | quote }}
+            - name: APP_URL
+              value: {{ .Values.env.APP_URL | quote }}
+            - name: API_URL
+              value: {{ .Values.env.API_URL | quote }}
+            - name: MCP_URL
+              value: {{ .Values.env.MCP_URL | quote }}
+            - name: CONVERTER_URL
+              value: "http://{{ .Release.Name }}-converter:8090"
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis-master:6379/0"
+            - name: MINIO_ENDPOINT
+              value: "{{ .Release.Name }}-minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.minio.auth.rootUser | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.minio.auth.rootPassword | quote }}
+            - name: MINIO_BUCKET
+              value: "llmwiki"
+            - name: ACTIVE_KEY_VERSION
+              value: "v1"
+            - name: KEYRING_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-platform-secrets
+                  key: keyringJson
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-platform-secrets
+                  key: internalServiceToken
+            - name: EMBEDDING_DIMENSIONS
+              value: {{ .Values.env.EMBEDDING_DIMENSIONS | quote }}
+          resources:
+            {{- toYaml .Values.resources.platformApi | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-platform-api
+spec:
+  type: {{ .Values.service.platformApi.type }}
+  ports:
+    - port: {{ .Values.service.platformApi.port }}
+      targetPort: 8000
+  selector:
+    app: {{ .Release.Name }}-platform-api

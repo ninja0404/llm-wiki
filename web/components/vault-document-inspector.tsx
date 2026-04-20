@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, GitBranch, Link2, MessageSquareQuote } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { getApiUrl } from "@/lib/api";
+import { clientApiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table";
 import { Badge } from "@/src/components/ui/badge";
@@ -68,14 +68,14 @@ export function VaultDocumentInspector({
   useEffect(() => {
     let disposed = false;
     async function refreshDetail() {
-      const endpoints = ["", "/pages", "/blocks", "/revisions", "/references", "/citations"];
-      const results = await Promise.all(
-        endpoints.map((ep) =>
-          fetch(`${getApiUrl()}/v1/documents/${documentId}${ep}`, { credentials: "include", cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : { data: ep === "" ? null : [] }))
-            .catch(() => ({ data: ep === "" ? null : [] }))
-        ),
-      );
+      const results = await Promise.all([
+        clientApiFetch<{ data: DocumentDetail | null }>(`/v1/documents/${documentId}`).catch(() => ({ data: null })),
+        clientApiFetch<{ data: PageItem[] }>(`/v1/documents/${documentId}/pages`).catch(() => ({ data: [] })),
+        clientApiFetch<{ data: BlockItem[] }>(`/v1/documents/${documentId}/blocks`).catch(() => ({ data: [] })),
+        clientApiFetch<{ data: RevisionItem[] }>(`/v1/documents/${documentId}/revisions`).catch(() => ({ data: [] })),
+        clientApiFetch<{ data: ReferenceItem[] }>(`/v1/documents/${documentId}/references`).catch(() => ({ data: [] })),
+        clientApiFetch<{ data: CitationItem[] }>(`/v1/documents/${documentId}/citations`).catch(() => ({ data: [] })),
+      ]);
       if (disposed) return;
       if (results[0].data) setDocument(results[0].data);
       setPages(results[1].data ?? []);

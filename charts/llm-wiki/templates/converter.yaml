@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-converter
+  labels:
+    app: {{ .Release.Name }}-converter
+spec:
+  replicas: {{ .Values.replicaCount.converter }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-converter
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-converter
+    spec:
+      containers:
+        - name: converter
+          image: "{{ .Values.image.converter.repository }}:{{ .Values.image.converter.tag }}"
+          imagePullPolicy: {{ .Values.image.converter.pullPolicy }}
+          ports:
+            - containerPort: 8090
+          env:
+            - name: APP_ENV
+              value: {{ .Values.env.APP_ENV | quote }}
+            - name: MINIO_ENDPOINT
+              value: "{{ .Release.Name }}-minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.minio.auth.rootUser | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.minio.auth.rootPassword | quote }}
+            - name: MINIO_BUCKET
+              value: "llmwiki"
+            - name: ACTIVE_KEY_VERSION
+              value: "v1"
+            - name: KEYRING_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-platform-secrets
+                  key: keyringJson
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-platform-secrets
+                  key: internalServiceToken
+          resources:
+            {{- toYaml .Values.resources.converter | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-converter
+spec:
+  type: {{ .Values.service.converter.type }}
+  ports:
+    - port: {{ .Values.service.converter.port }}
+      targetPort: 8090
+  selector:
+    app: {{ .Release.Name }}-converter

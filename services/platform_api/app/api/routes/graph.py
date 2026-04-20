@@ -4,8 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from ...core.deps import AuthContext, require_workspace_access
-from llm_wiki_core.db import get_db_pool
+from ...core.deps import AuthContext, get_workspace_conn, require_workspace_access
 
 
 router = APIRouter(tags=["graph"])
@@ -63,6 +62,7 @@ _SYSTEM_PATHS = {"/wiki/log.md", "/wiki/overview.md"}
 async def get_workspace_graph(
     workspace_id: str,
     auth: Annotated[AuthContext, Depends(require_workspace_access)],
+    connection=Depends(get_workspace_conn),
     include_claims: bool = Query(default=True),
     include_documents: bool = Query(default=True),
     include_references: bool = Query(default=True),
@@ -70,14 +70,13 @@ async def get_workspace_graph(
     max_nodes: int = Query(default=300, ge=1, le=1000),
     max_edges: int = Query(default=600, ge=1, le=2000),
 ) -> dict:
-    pool = await get_db_pool()
     nodes: dict[str, dict] = {}
     edges: dict[str, dict] = {}
 
     if focus_document_id:
-        return await _focused_graph(pool, workspace_id, focus_document_id, include_claims, include_documents, include_references, max_nodes, max_edges)
+        return await _focused_graph(connection, workspace_id, focus_document_id, include_claims, include_documents, include_references, max_nodes, max_edges)
 
-    entity_rows = await pool.fetch(
+    entity_rows = await connection.fetch(
         "SELECT id::text AS id, slug, title, entity_type, summary FROM entities WHERE workspace_id = $1::uuid ORDER BY updated_at DESC LIMIT $2",
         workspace_id, max_nodes,
     )
@@ -85,7 +84,7 @@ async def get_workspace_graph(
         node = _entity_node(dict(row))
         nodes[node["id"]] = node
 
-    relation_rows = await pool.fetch(
+    relation_rows = await connection.fetch(
         "SELECT id::text AS id, source_entity_id::text AS source_entity_id, target_entity_id::text AS target_entity_id, relation_type, metadata FROM relations WHERE workspace_id = $1::uuid LIMIT $2",
         workspace_id, max_edges,
     )
@@ -97,7 +96,7 @@ async def get_workspace_graph(
             edges[eid] = {"id": eid, "type": "relation", "source": src, "target": tgt, "label": row["relation_type"], "meta": {"relation_type": row["relation_type"]}}
 
     if include_claims:
-        claim_rows = await pool.fetch(
+        claim_rows = await connection.fetch(
             "SELECT id::text AS id, entity_id::text AS entity_id, canonical_text, confidence FROM claims WHERE workspace_id = $1::uuid AND entity_id IS NOT NULL LIMIT $2",
             workspace_id, max_nodes,
         )
@@ -110,7 +109,7 @@ async def get_workspace_graph(
                 edges[eid] = {"id": eid, "type": "claim_entity", "source": node["id"], "target": entity_key, "label": "supports", "meta": {}}
 
         if include_documents:
-            citation_rows = await pool.fetch(
+            citation_rows = await connection.fetch(
                 """
                 SELECT c.id::text AS id, c.claim_id::text AS claim_id, c.source_document_id::text AS source_document_id,
                        c.page_no, c.quote_text,
@@ -134,7 +133,7 @@ async def get_workspace_graph(
                     edges[eid] = {"id": eid, "type": "citation", "source": claim_key, "target": doc_key, "label": "cites", "meta": {"page_no": row["page_no"], "quote_text": (row["quote_text"] or "")[:200]}}
 
     if include_references and include_documents:
-        ref_rows = await pool.fetch(
+        ref_rows = await connection.fetch(
             """
             SELECT dr.id::text AS id, dr.source_document_id::text AS source_document_id,
                    dr.target_document_id::text AS target_document_id, dr.ref_type,

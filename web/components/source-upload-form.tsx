@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CloudUpload, FileText } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { getApiUrl } from "@/lib/api";
+import { clientFormFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Input } from "@/src/components/ui/input";
 import { Button } from "@/src/components/ui/button";
@@ -44,26 +44,21 @@ export function SourceUploadForm({ workspaceId }: { workspaceId: string }) {
     if (title.trim()) formData.append("title", title.trim());
     formData.append("source_path", sourcePath.trim() || "/sources/");
 
-    const response = await fetch(`${getApiUrl()}/v1/workspaces/${workspaceId}/documents/upload`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      setError(payload.detail ?? "Upload failed");
+    try {
+      const payload = await clientFormFetch<{ data: { run_id?: string } | null }>(
+        `/v1/workspaces/${workspaceId}/documents/upload`,
+        formData,
+      );
+      setTitle("");
+      setFile(null);
+      setSourcePath("/sources/");
       setSubmitting(false);
-      return;
+      setSuccess(payload.data?.run_id ? `Ingest run ${payload.data.run_id.slice(0, 8)}… queued.` : "Upload accepted.");
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+      setSubmitting(false);
     }
-
-    const payload = await response.json().catch(() => ({ data: null }));
-    setTitle("");
-    setFile(null);
-    setSourcePath("/sources/");
-    setSubmitting(false);
-    setSuccess(payload.data?.run_id ? `Ingest run ${payload.data.run_id.slice(0, 8)}… queued.` : "Upload accepted.");
-    router.refresh();
   }
 
   const t = useTranslations("sources");

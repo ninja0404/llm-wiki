@@ -6,6 +6,7 @@ import { Activity, Bot, Database, FileText, FolderTree, Globe, LogOut, Network, 
 import { ReactNode, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
+import { clientApiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -73,10 +74,9 @@ function UserInfo() {
   const [email, setEmail] = useState("");
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/v1/auth/me`, { credentials: "include" })
-      .then((r) => r.ok ? r.json() : null)
-      .catch(() => null)
-      .then((d) => { if (d?.data?.email) setEmail(d.data.email); });
+    clientApiFetch<{ data: { email: string } }>("/v1/auth/me")
+      .then((d) => { if (d?.data?.email) setEmail(d.data.email); })
+      .catch(() => null);
   }, []);
 
   if (!email) return null;

@@ -15,31 +15,20 @@ class Settings(BaseSettings):
     mcp_url: str = "http://localhost:8080/mcp"
     converter_url: str = "http://localhost:8090"
 
-    database_url: str = "postgresql://llmwiki:llmwiki@localhost:5432/llmwiki"
-    redis_url: str = "redis://localhost:6379/0"
+    database_url: str
+    redis_url: str
 
-    minio_endpoint: str = "localhost:9000"
+    minio_endpoint: str
     minio_use_ssl: bool = False
-    minio_access_key: str = "minioadmin"
-    minio_secret_key: str = "minioadmin"
-    minio_bucket: str = "llmwiki"
+    minio_access_key: str
+    minio_secret_key: str
+    minio_bucket: str
 
-    jwt_secret: str = Field(default="dev-jwt-secret-change-me-please", min_length=16)
-    agent_token_secret: str = Field(default="dev-agent-secret-change-me", min_length=16)
+    internal_service_token: str = Field(min_length=32)
+    active_key_version: str = Field(min_length=1)
+    keyring_json: str = Field(min_length=2)
 
-    openai_api_key: str | None = None
-    anthropic_api_key: str | None = None
     embedding_dimensions: int = 1024
-
-    embedding_api_key: str | None = None
-    embedding_base_url: str | None = None
-
-    # Seed values for workspace_settings initialization only — NOT used at runtime
-    seed_llm_provider: str = "openai"
-    seed_llm_model: str = "gpt-4.1-mini"
-    seed_embedding_provider: str = "openai"
-    seed_embedding_model: str = "text-embedding-3-small"
-
     worker_poll_interval_ms: int = 1500
 
 
@@ -50,4 +39,6 @@ def get_settings() -> Settings:
         parsed = urlparse(settings.minio_endpoint)
         settings.minio_endpoint = parsed.netloc
         settings.minio_use_ssl = parsed.scheme == "https"
+    if settings.app_env != "development" and not settings.app_url.startswith("https://"):
+        raise RuntimeError("Non-development deployments must use HTTPS APP_URL")
     return settings

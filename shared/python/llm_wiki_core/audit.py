@@ -15,9 +15,10 @@ async def log_activity(
     payload: dict[str, Any] | None = None,
     document_id: str | None = None,
     run_id: str | None = None,
+    connection=None,
 ) -> None:
-    async with acquire() as connection:
-        await connection.execute(
+    async def _write_activity(conn) -> None:
+        await conn.execute(
             """
             INSERT INTO activity_events (workspace_id, actor_type, actor_id, event_type, document_id, run_id, payload)
             VALUES ($1::uuid, $2::actor_type, $3, $4, $5::uuid, $6::uuid, $7::jsonb)
@@ -30,3 +31,10 @@ async def log_activity(
             run_id,
             orjson.dumps(payload or {}).decode(),
         )
+
+    if connection is not None:
+        await _write_activity(connection)
+        return
+
+    async with acquire(workspace_id) as conn:
+        await _write_activity(conn)

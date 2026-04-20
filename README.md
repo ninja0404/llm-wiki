@@ -35,7 +35,7 @@ Upload raw documents — LLM automatically extracts entities, claims, and relati
 | Backend | Python 3.11+ / FastAPI / asyncpg |
 | Database | PostgreSQL 18 + pgvector + pgroonga |
 | Storage | MinIO (S3-compatible) |
-| Queue | Redis (List-based) |
+| Queue | Redis Streams + Consumer Groups |
 | LLM | OpenAI / Anthropic / DeepSeek / SiliconFlow (configurable per workspace) |
 | Embedding | Configurable per workspace (1024-dim vectors) |
 | Frontend | Next.js 15 / React 19 / Tailwind CSS v4 / shadcn/ui |
@@ -45,19 +45,19 @@ Upload raw documents — LLM automatically extracts entities, claims, and relati
 
 ```bash
 # 1. Start infrastructure
-docker compose up -d
+docker compose up -d postgres redis minio
 
 # 2. Check dependencies
 python3 scripts/check_local_stack.py
 
 # 3. Initialize database
-python3 scripts/init_local_db.py
+python3 scripts/init_local_db.py --reset
 
 # 4. Install Python dependencies
 pip install -e ".[dev]"
 
 # 5. Install frontend dependencies
-cd web && bun install && cd ..
+pnpm --dir web install
 
 # 6. Start all services
 python3 scripts/dev_stack.py
@@ -93,8 +93,11 @@ All runtime configuration (LLM provider, model, API key, embedding config, compi
 
 ```bash
 pytest tests/unit tests/integration
+bash scripts/run_local_checks.sh
 ```
 
 ## Environment Variables
 
 See `.env.example`. Only infrastructure connection details and embedding dimensions are configured via env. Provider/model selection is done per-workspace in the Settings page.
+
+Database schema initialization is Alembic-only. Legacy SQL patches are archived for reference and are not part of the active initialization flow.

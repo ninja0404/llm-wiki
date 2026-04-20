@@ -1,25 +1,32 @@
 from __future__ import annotations
 
+import asyncio
+import os
 import re
 from dataclasses import asdict
-from datetime import datetime
+from datetime import UTC, datetime
 
+import httpx
 import orjson
 
 import logging
 
-from llm_wiki_core.audit import log_activity
 from llm_wiki_core.change_plan import ChangeAction, ChangePlan
 from llm_wiki_core.config import get_settings
+from llm_wiki_core.crypto import decrypt_value
 from llm_wiki_core.db import acquire
 from llm_wiki_core.embeddings import EmbeddingConfig, generate_embedding
 from llm_wiki_core.llm import LLMConfig, invoke_structured
 from llm_wiki_core.markdown_ops import append_markdown
+from llm_wiki_core.metrics import CONVERTER_CALLS_TOTAL, CONVERTER_DURATION
 from llm_wiki_core.parsing import ParsedDocument, parse_document
 from llm_wiki_core.queue import publish_event
 from llm_wiki_core.storage import get_bytes
+from llm_wiki_core.tracing import inject_trace_headers, traced_span
+from llm_wiki_core.write_journal import append_run_step, create_document, create_revision, record_activity, set_document_revision, update_run
 
 logger = logging.getLogger(__name__)
+CONVERTIBLE_SOURCE_EXTENSIONS = {"doc", "ppt", "pptx"}
 
 
 def _slugify(value: str) -> str:
@@ -124,7 +131,10 @@ def _build_extract_system(rules: dict) -> str:
 def _build_llm_config(ws_settings: dict) -> LLMConfig:
     provider = ws_settings.get("llm_provider", "")
     model = ws_settings.get("llm_model", "")
-    api_key = ws_settings.get("llm_api_key", "")
+    api_key = decrypt_value(
+        ws_settings.get("llm_api_key_ciphertext"),
+        ws_settings.get("llm_api_key_key_version"),
+    )
     base_url = ws_settings.get("llm_base_url", "") or None
     if not provider or not model:
         raise RuntimeError(f"Workspace LLM configuration incomplete: provider='{provider}', model='{model}'")
@@ -135,7 +145,10 @@ def _build_llm_config(ws_settings: dict) -> LLMConfig:
 
 def _build_embedding_config(ws_settings: dict) -> EmbeddingConfig:
     settings = get_settings()
-    api_key = ws_settings.get("embedding_api_key", "")
+    api_key = decrypt_value(
+        ws_settings.get("embedding_api_key_ciphertext"),
+        ws_settings.get("embedding_api_key_key_version"),
+    )
     base_url = ws_settings.get("embedding_base_url", "")
     model = ws_settings.get("embedding_model", "")
     if not api_key or not base_url:
@@ -306,7 +319,7 @@ def _build_change_plan(
             )
         )
 
-    log_line = f"""## [{datetime.utcnow().date().isoformat()}] ingest | {source_title}
+    log_line = f"""## [{datetime.now(UTC).date().isoformat()}] ingest | {source_title}
 - Parsed {len(parsed_document.pages)} page(s)
 - Extracted {len(entities)} entities, {len(claims)} claims, {len(relations)} relations
 - Updated overview and compiled wiki pages
@@ -323,60 +336,61 @@ def _build_change_plan(
     return ChangePlan(actions=actions, summary=f"Compiled {len(entities)} wiki nodes from {source_title}")
 
 
-async def fail_run(run_id: str, workspace_id: str | None, error_message: str) -> None:
-    async with acquire() as connection:
-        if workspace_id is None:
-            workspace_id = await connection.fetchval(
-                "SELECT workspace_id::text FROM runs WHERE id = $1::uuid",
-                run_id,
-            )
-        await connection.execute(
-            """
-            UPDATE runs
-            SET status = 'failed',
-                error_message = $2,
-                completed_at = NOW()
-            WHERE id = $1::uuid
-            """,
-            run_id,
-            error_message[:1000],
-        )
-        await connection.execute(
-            """
-            INSERT INTO run_steps (run_id, step_key, status, payload, error_message, started_at, completed_at)
-            VALUES ($1::uuid, 'failed', 'failed', '{}'::jsonb, $2, NOW(), NOW())
-            """,
-            run_id,
-            error_message[:1000],
-        )
-    if workspace_id:
-        await log_activity(
+async def fail_run(run_id: str, workspace_id: str, error_message: str) -> None:
+    async with acquire(workspace_id) as connection:
+        await update_run(connection, run_id, status="failed", error_message=error_message[:1000], completed_now=True)
+        await append_run_step(connection, run_id, "failed", "failed", error_message=error_message[:1000])
+        await record_activity(
             workspace_id=workspace_id,
             actor_type="system",
             actor_id="compiler-worker",
             event_type="run.failed",
             payload={"error": error_message[:300]},
             run_id=run_id,
+            connection=connection,
         )
-        await publish_event(
-            f"workspace:{workspace_id}",
-            {"type": "run.failed", "payload": {"run_id": run_id, "error": error_message[:300]}},
-        )
+    await publish_event(
+        f"workspace:{workspace_id}",
+        {"type": "run.failed", "payload": {"run_id": run_id, "error": error_message[:300]}},
+    )
 
 
-async def _record_step(run_id: str, step_key: str, status: str, payload: dict | None = None, error_message: str | None = None) -> None:
-    async with acquire() as connection:
-        await connection.execute(
-            """
-            INSERT INTO run_steps (run_id, step_key, status, payload, error_message, started_at, completed_at)
-            VALUES ($1::uuid, $2, $3::run_status, $4::jsonb, $5, NOW(), NOW())
-            """,
+async def schedule_retry(run_id: str, workspace_id: str, error_message: str, next_attempt: int) -> None:
+    async with acquire(workspace_id) as connection:
+        await update_run(connection, run_id, status="queued", error_message=error_message[:1000])
+        await append_run_step(
+            connection,
             run_id,
-            step_key,
-            status,
-            orjson.dumps(payload or {}).decode(),
-            error_message,
+            "retry_scheduled",
+            "queued",
+            payload={"attempt": next_attempt},
+            error_message=error_message[:1000],
         )
+        await record_activity(
+            workspace_id=workspace_id,
+            actor_type="system",
+            actor_id="compiler-worker",
+            event_type="run.retry_scheduled",
+            payload={"error": error_message[:300], "attempt": next_attempt},
+            run_id=run_id,
+            connection=connection,
+        )
+    await publish_event(
+        f"workspace:{workspace_id}",
+        {"type": "run.retry_scheduled", "payload": {"run_id": run_id, "attempt": next_attempt}},
+    )
+
+
+async def _record_step(
+    run_id: str,
+    workspace_id: str,
+    step_key: str,
+    status: str,
+    payload: dict | None = None,
+    error_message: str | None = None,
+) -> None:
+    async with acquire(workspace_id) as connection:
+        await append_run_step(connection, run_id, step_key, status, payload, error_message)
 
 
 async def _upsert_entity(connection, workspace_id: str, entity: dict) -> str:
@@ -425,43 +439,36 @@ async def _append_or_replace_document(
         content_md = action.content
         document_id = doc["id"]
     else:
-        created = await connection.fetchrow(
-            """
-            INSERT INTO documents (workspace_id, kind, path, title, mime_type, status, policy)
-            VALUES ($1::uuid, 'wiki', $2, $3, 'text/markdown', 'ready', 'system_managed')
-            RETURNING id::text AS id
-            """,
-            workspace_id,
-            action.path,
-            action.title,
+        created = await create_document(
+            connection,
+            workspace_id=workspace_id,
+            kind="wiki",
+            path=action.path,
+            title=action.title,
+            mime_type="text/markdown",
+            status="ready",
+            policy="system_managed",
         )
-        document_id = created["id"]
+        document_id = created.id
         content_md = action.content
 
-    revision = await connection.fetchrow(
-        """
-        INSERT INTO document_revisions (document_id, actor_type, actor_id, run_id, reason, content_md, content_ast, diff_summary)
-        VALUES ($1::uuid, 'system', $2, $3::uuid, $4, $5, '{}'::jsonb, $6::jsonb)
-        RETURNING id::text AS id
-        """,
-        document_id,
-        actor_id,
-        run_id,
-        action.reason,
-        content_md,
-        orjson.dumps({"op": action.op, "path": action.path}).decode(),
+    revision = await create_revision(
+        connection,
+        document_id=document_id,
+        actor_type="system",
+        actor_id=actor_id,
+        run_id=run_id,
+        reason=action.reason,
+        content_md=content_md,
+        diff_summary={"op": action.op, "path": action.path},
     )
-    await connection.execute(
-        "UPDATE documents SET current_revision_id = $1::uuid, status = 'ready' WHERE id = $2::uuid",
-        revision["id"],
-        document_id,
-    )
+    await set_document_revision(connection, document_id, revision.id, status="ready")
     return document_id
 
 
-async def process_run(run_id: str) -> None:
-    await _record_step(run_id, "start", "running", {"run_id": run_id})
-    async with acquire() as connection:
+async def process_run(run_id: str, workspace_id: str, attempts: int = 1) -> None:
+    await _record_step(run_id, workspace_id, "start", "running", {"run_id": run_id, "attempt": attempts})
+    async with acquire(workspace_id) as connection:
         run = await connection.fetchrow(
             """
             SELECT id::text AS id, workspace_id::text AS workspace_id, input, actor_id
@@ -487,8 +494,8 @@ async def process_run(run_id: str) -> None:
         )
         ws_settings_row = await connection.fetchrow(
             """
-            SELECT llm_provider, llm_model, llm_api_key, llm_base_url,
-                   embedding_provider, embedding_model, embedding_api_key, embedding_base_url,
+            SELECT llm_provider, llm_model, llm_api_key_ciphertext, llm_api_key_key_version, llm_base_url,
+                   embedding_provider, embedding_model, embedding_api_key_ciphertext, embedding_api_key_key_version, embedding_base_url,
                    compiler_rules, search_rules
             FROM workspace_settings
             WHERE workspace_id = $1::uuid
@@ -502,25 +509,56 @@ async def process_run(run_id: str) -> None:
         embedding_config = _build_embedding_config(ws_settings)
         compiler_rules = _get_compiler_rules(ws_settings)
         logger.info("run %s: using llm=%s/%s, embedding=%s, rules=%s", run_id, llm_config.provider, llm_config.model, embedding_config.model, compiler_rules)
-        await connection.execute(
-            "UPDATE runs SET status = 'running', started_at = NOW() WHERE id = $1::uuid",
-            run_id,
-        )
+        await update_run(connection, run_id, status="running", started_now=True)
 
     storage_key = source_document["metadata"]["storage_key"]
     file_name = source_document["metadata"]["filename"]
-    raw_bytes = get_bytes(storage_key)
-    parsed = parse_document(file_name, raw_bytes, source_document["metadata"].get("mime_type"))
+    source_ext = os.path.splitext(file_name or "")[1].lstrip(".").lower()
+
+    if source_ext in CONVERTIBLE_SOURCE_EXTENSIONS:
+        settings = get_settings()
+        converted_key = f"{storage_key}.converted.pdf"
+        import time
+
+        start = time.perf_counter()
+        headers = inject_trace_headers({})
+        with traced_span(
+            "converter.request",
+            tracer_name="compiler-worker",
+            attributes={"converter.source_ext": source_ext, "converter.source_object_key": storage_key},
+        ):
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{settings.converter_url.rstrip('/')}/convert",
+                    json={
+                        "source_object_key": storage_key,
+                        "target_object_key": converted_key,
+                        "source_ext": source_ext,
+                    },
+                    headers={**headers, "Authorization": f"Bearer {settings.internal_service_token}"},
+                )
+                response.raise_for_status()
+        CONVERTER_CALLS_TOTAL.labels(source_ext=source_ext, status="succeeded").inc()
+        CONVERTER_DURATION.labels(source_ext=source_ext).observe(time.perf_counter() - start)
+        raw_bytes = await asyncio.to_thread(get_bytes, converted_key)
+        parsed = parse_document(f"{os.path.splitext(file_name)[0]}.pdf", raw_bytes, "application/pdf")
+    else:
+        raw_bytes = await asyncio.to_thread(get_bytes, storage_key)
+        parsed = parse_document(file_name, raw_bytes, source_document["metadata"].get("mime_type"))
     blocks = _split_blocks(parsed)
-    await _record_step(run_id, "parse", "succeeded", {"pages": len(parsed.pages), "blocks": len(blocks)})
+    await _record_step(run_id, workspace_id, "parse", "succeeded", {"pages": len(parsed.pages), "blocks": len(blocks)})
 
     entities, claims, relations = await _extract_entities_and_graph(parsed, blocks, llm_config, compiler_rules)
-    await _record_step(run_id, "extract", "succeeded", {
+    await _record_step(run_id, workspace_id, "extract", "succeeded", {
         "entities": len(entities), "claims": len(claims), "relations": len(relations),
     })
+    block_embeddings = []
+    for block in blocks:
+        embedding = await generate_embedding(block["text"], embedding_config)
+        block_embeddings.append({"block": block, "embedding": embedding})
 
     plan = _build_change_plan(workspace["name"], source_document, parsed, entities, claims, relations, blocks)
-    await log_activity(
+    await record_activity(
         workspace_id=run["workspace_id"],
         actor_type="system",
         actor_id="compiler-worker",
@@ -530,24 +568,20 @@ async def process_run(run_id: str) -> None:
         document_id=document_id,
     )
 
-    async with acquire() as connection:
+    async with acquire(run["workspace_id"]) as connection:
         async with connection.transaction():
             full_source_content = "\n\n---\n\n".join(page.text_md for page in parsed.pages)
-            source_revision = await connection.fetchrow(
-                """
-                INSERT INTO document_revisions (document_id, actor_type, actor_id, run_id, reason, content_md, content_ast, diff_summary)
-                VALUES ($1::uuid, 'system', 'compiler-worker', $2::uuid, 'Normalize source content', $3, '{}'::jsonb, '{"op":"replace_section"}'::jsonb)
-                RETURNING id::text AS id
-                """,
-                document_id,
-                run_id,
-                full_source_content,
+            source_revision = await create_revision(
+                connection,
+                document_id=document_id,
+                actor_type="system",
+                actor_id="compiler-worker",
+                run_id=run_id,
+                reason="Normalize source content",
+                content_md=full_source_content,
+                diff_summary={"op": "replace_section"},
             )
-            await connection.execute(
-                "UPDATE documents SET current_revision_id = $1::uuid WHERE id = $2::uuid",
-                source_revision["id"],
-                document_id,
-            )
+            await set_document_revision(connection, document_id, source_revision.id)
             await connection.execute("DELETE FROM document_pages WHERE document_id = $1::uuid", document_id)
             await connection.execute("DELETE FROM document_blocks WHERE document_id = $1::uuid", document_id)
             await connection.execute(
@@ -591,8 +625,8 @@ async def process_run(run_id: str) -> None:
                 )
 
             block_rows = []
-            for block in blocks:
-                embedding = await generate_embedding(block["text"], embedding_config)
+            for item in block_embeddings:
+                block = item["block"]
                 block_row = await connection.fetchrow(
                     """
                     INSERT INTO document_blocks (document_id, page_no, block_type, heading_path, text, bbox, token_count, embedding)
@@ -606,7 +640,7 @@ async def process_run(run_id: str) -> None:
                     block["text"],
                     orjson.dumps(block["bbox"]).decode(),
                     block["token_count"],
-                    _vector_literal(embedding),
+                    _vector_literal(item["embedding"]),
                 )
                 block_rows.append({"id": block_row["id"], "page_no": block_row["page_no"], "text": block["text"]})
 
@@ -780,28 +814,22 @@ graph TD
                 """,
                 document_id,
             )
-            await connection.execute(
-                """
-                UPDATE runs
-                SET status = 'succeeded',
-                    output = $2::jsonb,
-                    completed_at = NOW()
-                WHERE id = $1::uuid
-                """,
+            await update_run(
+                connection,
                 run_id,
-                orjson.dumps(
-                    {
-                        "pages": len(parsed.pages),
-                        "blocks": len(blocks),
-                        "entities": len(entities),
-                        "claims": len(claims),
-                        "relations": len(relations),
-                        "change_plan": [asdict(action) for action in plan.actions],
-                    }
-                ).decode(),
+                status="succeeded",
+                output_payload={
+                    "pages": len(parsed.pages),
+                    "blocks": len(blocks),
+                    "entities": len(entities),
+                    "claims": len(claims),
+                    "relations": len(relations),
+                    "change_plan": [asdict(action) for action in plan.actions],
+                },
+                completed_now=True,
             )
-    await _record_step(run_id, "compile", "succeeded", {"summary": plan.summary})
-    await log_activity(
+    await _record_step(run_id, workspace_id, "compile", "succeeded", {"summary": plan.summary})
+    await record_activity(
         workspace_id=run["workspace_id"],
         actor_type="system",
         actor_id="compiler-worker",

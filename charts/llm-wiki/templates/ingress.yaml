@@ -26,40 +26,40 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
-          - path: /api
+          - path: /v1
             pathType: Prefix
             backend:
               service:
-                name: {{ $.Release.Name }}-api
+                name: {{ $.Release.Name }}-platform-api
                 port:
-                  number: 3001
-          - path: /ws
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ $.Release.Name }}-api
-                port:
-                  number: 3001
+                  number: 8000
           - path: /health
-            pathType: Exact
+            pathType: Prefix
             backend:
               service:
-                name: {{ $.Release.Name }}-api
+                name: {{ $.Release.Name }}-platform-api
                 port:
-                  number: 3001
+                  number: 8000
           - path: /metrics
-            pathType: Exact
+            pathType: Prefix
             backend:
               service:
-                name: {{ $.Release.Name }}-api
+                name: {{ $.Release.Name }}-platform-api
                 port:
-                  number: 3001
+                  number: 8000
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Release.Name }}-mcp
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: {{ $.Release.Name }}-web
                 port:
-                  number: 80
+                  number: 3000
     {{- end }}
 {{- end }}

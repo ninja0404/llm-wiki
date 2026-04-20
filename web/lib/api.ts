@@ -45,3 +45,26 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   return response.json();
 }
+
+export function clientApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  return apiFetch<T>(path, init);
+}
+
+export async function clientFormFetch<T>(path: string, body: FormData, init?: RequestInit): Promise<T> {
+  const headers = { ...(init?.headers as Record<string, string> ?? {}) };
+  const response = await fetch(`${getApiUrl()}${path}`, {
+    ...init,
+    method: init?.method ?? "POST",
+    headers,
+    body,
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail ?? payload.error ?? "Request failed");
+  }
+
+  return response.json();
+}

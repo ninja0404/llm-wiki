@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { getApiUrl } from "@/lib/api";
+import { clientApiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table";
 
@@ -30,13 +30,12 @@ export function RunStatusList({ workspaceId, initialRuns }: { workspaceId: strin
   useEffect(() => {
     let disposed = false;
     async function loadRuns() {
-      const response = await fetch(`${getApiUrl()}/v1/workspaces/${workspaceId}/runs`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      if (!response.ok || disposed) return;
-      const payload = await response.json().catch(() => ({ data: [] }));
-      if (!disposed) setRuns(payload.data ?? []);
+      try {
+        const payload = await clientApiFetch<{ data: RunSummary[] }>(`/v1/workspaces/${workspaceId}/runs`);
+        if (!disposed) setRuns(payload.data ?? []);
+      } catch {
+        return;
+      }
     }
     const timer = window.setInterval(loadRuns, 3000);
     return () => { disposed = true; window.clearInterval(timer); };

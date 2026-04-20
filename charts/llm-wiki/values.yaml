@@ -1,15 +1,25 @@
 replicaCount:
-  api: 1
+  platformApi: 1
   worker: 1
+  mcp: 1
+  converter: 1
   web: 1
 
 image:
-  api:
-    repository: llm-wiki/api
+  platformApi:
+    repository: llm-wiki/platform-api
     tag: latest
     pullPolicy: IfNotPresent
   worker:
-    repository: llm-wiki/worker
+    repository: llm-wiki/compiler-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  mcp:
+    repository: llm-wiki/mcp-service
+    tag: latest
+    pullPolicy: IfNotPresent
+  converter:
+    repository: llm-wiki/converter-service
     tag: latest
     pullPolicy: IfNotPresent
   web:
@@ -18,12 +28,18 @@ image:
     pullPolicy: IfNotPresent
 
 service:
-  api:
+  platformApi:
     type: ClusterIP
-    port: 3001
+    port: 8000
+  mcp:
+    type: ClusterIP
+    port: 8080
+  converter:
+    type: ClusterIP
+    port: 8090
   web:
     type: ClusterIP
-    port: 80
+    port: 3000
 
 ingress:
   enabled: false
@@ -37,16 +53,17 @@ ingress:
   tls: []
 
 env:
-  NODE_ENV: production
-  PORT: "3001"
-  BASE_URL: "http://localhost:3001"
-  CORS_ORIGINS: "http://localhost"
-  TRUSTED_ORIGINS: "http://localhost"
+  APP_ENV: production
+  APP_URL: https://wiki.example.com
+  API_URL: https://wiki.example.com
+  MCP_URL: https://wiki.example.com/mcp
+  CONVERTER_URL: http://{{ .Release.Name }}-converter:8090
+  EMBEDDING_DIMENSIONS: "1024"
+  WORKER_POLL_INTERVAL_MS: "1500"
 
 secrets:
-  betterAuthSecret: ""
-  encryptionKey: ""
-  openaiApiKey: ""
+  keyringJson: ""
+  internalServiceToken: ""
 
 postgresql:
   enabled: true
@@ -77,7 +94,7 @@ minio:
     size: 10Gi
 
 resources:
-  api:
+  platformApi:
     limits:
       cpu: 500m
       memory: 512Mi
@@ -91,10 +108,24 @@ resources:
     requests:
       cpu: 200m
       memory: 512Mi
+  mcp:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  converter:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
   web:
     limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
       cpu: 100m
       memory: 128Mi
-    requests:
-      cpu: 50m
-      memory: 64Mi

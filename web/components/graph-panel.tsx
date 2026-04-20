@@ -5,7 +5,7 @@ import { AlertCircle, Loader2, Minus, Maximize, Network, Plus, X, ExternalLink }
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { getApiUrl } from "@/lib/api";
+import { clientApiFetch } from "@/lib/api";
 import { GraphCanvas } from "@/components/graph-canvas";
 import { Card, CardContent } from "@/src/components/ui/card";
 import { Badge } from "@/src/components/ui/badge";
@@ -41,9 +41,8 @@ export function GraphPanel({ workspaceId, workspaceName }: { workspaceId: string
     try {
       const params = new URLSearchParams({ include_claims: String(showClaims), include_documents: String(showDocuments), include_references: String(showReferences) });
       if (focusDocId) params.set("focus_document_id", focusDocId);
-      const res = await fetch(`${getApiUrl()}/v1/workspaces/${workspaceId}/graph?${params}`, { credentials: "include" });
-      if (!res.ok) { const p = await res.json().catch(() => ({})); throw new Error(p.detail ?? "Failed to load graph"); }
-      setData((await res.json()).data);
+      const payload = await clientApiFetch<{ data: GraphData }>(`/v1/workspaces/${workspaceId}/graph?${params}`);
+      setData(payload.data);
     } catch (err: unknown) { setError(err instanceof Error ? err.message : "Failed to load graph"); }
     setLoading(false);
   }, [workspaceId, showClaims, showDocuments, showReferences, focusDocId]);

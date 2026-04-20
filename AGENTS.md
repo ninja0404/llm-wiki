@@ -17,7 +17,7 @@ docker compose down           # Stop services
 python3 scripts/check_local_stack.py   # Verify infrastructure readiness
 python3 scripts/init_local_db.py       # Initialize database schema
 pip install -e ".[dev]"                # Install Python dependencies
-cd web && bun install && cd ..         # Install frontend dependencies
+pnpm --dir web install                 # Install frontend dependencies
 python3 scripts/dev_stack.py           # Start all 5 services concurrently
 
 # Individual services
@@ -25,16 +25,16 @@ uvicorn services.platform_api.app.main:app --reload --host 0.0.0.0 --port 8000  
 python -m services.compiler_worker.app.main                                        # Compiler Worker
 uvicorn services.mcp_service.app.main:app --reload --host 0.0.0.0 --port 8080    # MCP Service
 uvicorn services.converter_service.app.main:app --reload --host 0.0.0.0 --port 8090  # Converter
-cd web && bun dev                      # Frontend dev server
+pnpm --dir web dev                     # Frontend dev server
 
 # Testing
 pytest tests/unit tests/integration    # Run all tests
 ruff check .                           # Lint Python code
 
 # Frontend
-cd web && bun dev              # Dev server (http://localhost:3000)
-cd web && bun run build        # Production build
-cd web && bun run lint         # TypeScript check
+pnpm --dir web dev             # Dev server (http://localhost:3000)
+pnpm --dir web run build       # Production build
+pnpm --dir web run lint        # TypeScript check
 ```
 
 ## Tech Stack
@@ -44,12 +44,12 @@ cd web && bun run lint         # TypeScript check
 | Backend | Python 3.11+ / FastAPI / asyncpg |
 | Database | PostgreSQL + pgvector + pgroonga + pg_trgm |
 | Storage | MinIO (S3-compatible) |
-| Queue | Redis (List-based RPUSH/BLPOP) |
+| Queue | Redis Streams + Consumer Groups |
 | LLM | OpenAI / Anthropic / DeepSeek / SiliconFlow (configurable per workspace) |
 | Embedding | Configurable per workspace (1024-dim vectors) |
 | Frontend | Next.js 15 / React 19 / Tailwind CSS v4 / next-intl |
 | MCP | FastMCP (Streamable HTTP) |
-| Package Manager | pip (Python) / bun (Frontend) |
+| Package Manager | pip (Python) / pnpm (Frontend) |
 | Docker | docker compose (never docker-compose) |
 
 ## Architecture
@@ -88,14 +88,15 @@ llm-wiki/
 │   ├── llm.py                     # LLM invocation (OpenAI-compatible + Anthropic)
 │   ├── embeddings.py              # Embedding generation via HTTP API
 │   ├── parsing.py                 # Document parsing (PDF, DOCX, XLSX, CSV, MD, HTML)
-│   ├── security.py                # JWT, bcrypt, agent token generation
+│   ├── security.py                # Opaque sessions, bcrypt, agent token generation
 │   ├── storage.py                 # MinIO object storage
 │   ├── audit.py                   # Activity event logging
 │   ├── change_plan.py             # Change plan data structure
 │   ├── diffing.py                 # Content diff utilities
 │   └── markdown_ops.py            # Markdown manipulation
 ├── web/                           # Next.js 15 frontend (App Router)
-├── db/migrations/                 # SQL migration files
+├── alembic/                       # Active Alembic migrations
+├── docs/archive/db-migrations-legacy/  # Archived legacy SQL migration snapshots
 ├── scripts/                       # Development utilities
 ├── tests/                         # Test suite
 ├── docker-compose.yml             # Dev infrastructure
@@ -112,8 +113,8 @@ llm-wiki/
 
 ```
 Upload file → MinIO storage → document record (status=draft)
- → Run created (type=ingest) → Redis queue (RPUSH)
- → Compiler Worker (BLPOP) → parse → split blocks → generate embeddings
+ → Run created (type=ingest) → Redis stream enqueue
+ → Compiler Worker consumer group → parse → split blocks → generate embeddings
  → LLM extract entities/claims/relations → write to DB
  → Build change plan → create wiki documents → publish event
 ```
@@ -156,15 +157,15 @@ PostgreSQL extensions: `pgvector`, `pgroonga`, `pg_trgm`, `pgcrypto`.
 
 See `.env.example`. LLM/embedding provider/model/key is configured per-workspace in Settings page, not via env.
 
-Required: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `AGENT_TOKEN_SECRET`
+Required: `DATABASE_URL`, `REDIS_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `ACTIVE_KEY_VERSION`, `KEYRING_JSON`
 
 ## Important Conventions
 
-- **Package manager**: pip for Python, bun for frontend. Never use npm.
+- **Package manager**: pip for Python, pnpm for frontend. Never use npm.
 - **Docker**: Always `docker compose`, never `docker-compose`
 - **Database**: Raw asyncpg queries with `$1::uuid` casting — no ORM
 - **JSON**: `orjson` for serialization
-- **Auth**: JWT via `PyJWT`, passwords via `bcrypt`, agent tokens SHA-256 hashed with `lwa_` prefix
+- **Auth**: Opaque session tokens + DB hash storage, passwords via `bcrypt`, agent tokens SHA-256 hashed with `lwa_` prefix
 - **Embedding**: 1024-dim vectors, L2-normalized
 - **Per-workspace config**: LLM/embedding settings stored in `workspace_settings` table, not env vars
 - **PYTHONPATH**: Must include project root + `shared/python/`

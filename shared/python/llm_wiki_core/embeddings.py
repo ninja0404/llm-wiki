@@ -6,6 +6,9 @@ from dataclasses import dataclass
 
 import httpx
 
+from .metrics import EMBEDDING_CALLS_TOTAL, EMBEDDING_DURATION
+from .tracing import traced_span
+
 logger = logging.getLogger(__name__)
 
 _http_client: httpx.AsyncClient | None = None
@@ -42,6 +45,8 @@ async def _api_embedding(
     text: str,
     dimensions: int,
 ) -> list[float]:
+    import time
+
     url = f"{base_url.rstrip('/')}/embeddings"
     client = _get_http_client()
     body: dict = {
@@ -51,14 +56,27 @@ async def _api_embedding(
     if "bge" not in model.lower():
         body["dimensions"] = dimensions
 
-    response = await client.post(
-        url,
-        json=body,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-    )
-    response.raise_for_status()
-    data = response.json()
-    vector: list[float] = data["data"][0]["embedding"]
+    start = time.perf_counter()
+    try:
+        with traced_span(
+            "embedding.invoke",
+            tracer_name="embedding",
+            attributes={"embedding.model": model, "embedding.dimensions": dimensions},
+        ):
+            response = await client.post(
+                url,
+                json=body,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+            data = response.json()
+            vector: list[float] = data["data"][0]["embedding"]
+        EMBEDDING_CALLS_TOTAL.labels(model=model, status="succeeded").inc()
+        EMBEDDING_DURATION.labels(model=model).observe(time.perf_counter() - start)
+    except Exception:
+        EMBEDDING_CALLS_TOTAL.labels(model=model, status="failed").inc()
+        EMBEDDING_DURATION.labels(model=model).observe(time.perf_counter() - start)
+        raise
 
     if len(vector) > dimensions:
         vector = vector[:dimensions]

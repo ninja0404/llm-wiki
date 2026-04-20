@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Database } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { getApiUrl } from "@/lib/api";
+import { clientApiFetch } from "@/lib/api";
 
 function GoogleIcon() {
   return (
@@ -39,19 +39,17 @@ export function LoginForm() {
     event.preventDefault();
     setSubmitting(true);
     setError("");
-    const response = await fetch(`${getApiUrl()}/v1/auth/${mode === "login" ? "login" : "register"}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(
-        mode === "login"
-          ? { email, password }
-          : { email, password, display_name: displayName }
-      ),
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      setError(payload.detail ?? "Authentication failed");
+    try {
+      await clientApiFetch(`/v1/auth/${mode === "login" ? "login" : "register"}`, {
+        method: "POST",
+        body: JSON.stringify(
+          mode === "login"
+            ? { email, password }
+            : { email, password, display_name: displayName }
+        ),
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
       setSubmitting(false);
       return;
     }

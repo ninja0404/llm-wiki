@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: ankane/pgvector:latest
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    image: llm-wiki-postgres:latest
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-llmwiki}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-llmwiki}
@@ -8,8 +11,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./db/migrations/001_vnext_schema.sql:/docker-entrypoint-initdb.d/001_vnext_schema.sql:ro
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-llmwiki} -d ${POSTGRES_DB:-llmwiki}"]
       interval: 5s
@@ -46,6 +48,9 @@ services:
       DATABASE_URL: postgresql://llmwiki:llmwiki@postgres:5432/llmwiki
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      ACTIVE_KEY_VERSION: ${ACTIVE_KEY_VERSION}
+      KEYRING_JSON: ${KEYRING_JSON}
       APP_URL: ${APP_URL:-http://localhost:3000}
       API_URL: http://platform-api:8000
       MCP_URL: ${MCP_URL:-http://localhost:8080/mcp}
@@ -70,6 +75,9 @@ services:
       DATABASE_URL: postgresql://llmwiki:llmwiki@postgres:5432/llmwiki
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      ACTIVE_KEY_VERSION: ${ACTIVE_KEY_VERSION}
+      KEYRING_JSON: ${KEYRING_JSON}
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,6 +96,9 @@ services:
       DATABASE_URL: postgresql://llmwiki:llmwiki@postgres:5432/llmwiki
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      ACTIVE_KEY_VERSION: ${ACTIVE_KEY_VERSION}
+      KEYRING_JSON: ${KEYRING_JSON}
       API_URL: http://platform-api:8000
       MCP_URL: ${MCP_URL:-http://localhost:8080/mcp}
     depends_on:
@@ -104,8 +115,11 @@ services:
       dockerfile: services/converter_service/Dockerfile
     env_file:
       - .env
-    ports:
-      - "8090:8090"
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      ACTIVE_KEY_VERSION: ${ACTIVE_KEY_VERSION}
+      KEYRING_JSON: ${KEYRING_JSON}
 
   web:
     build:

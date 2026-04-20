@@ -1,9 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Cookie, Depends, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from ...core.deps import AuthContext, authenticate_user, issue_session, register_user, require_auth
+from ...core.deps import AuthContext, SESSION_COOKIE, authenticate_user, issue_session, register_user, require_auth, revoke_session
+from llm_wiki_core.config import get_settings
+from ...core.rate_limit import limiter
 from llm_wiki_core.db import get_db_pool
 from ...services.workspace import bootstrap_workspace
 
@@ -23,7 +25,13 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/register")
-async def register(body: RegisterRequest, response: Response) -> dict:
+@limiter.limit("5/minute")
+async def register(
+    request: Request,
+    body: RegisterRequest,
+    response: Response,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+) -> dict:
     user_id = await register_user(body.email, body.password, body.display_name)
     pool = await get_db_pool()
     async with pool.acquire() as connection:
@@ -46,15 +54,33 @@ async def register(body: RegisterRequest, response: Response) -> dict:
                 user_id,
             )
     await bootstrap_workspace(organization["id"], "Core Vault", "Primary compiled knowledge workspace")
-    token = await issue_session(response, user_id)
-    return {"data": {"user_id": user_id, "session_token": token}}
+    await issue_session(response, user_id, replaced_token=session_cookie)
+    return {"data": {"user_id": user_id}}
 
 
 @router.post("/login")
-async def login(body: LoginRequest, response: Response) -> dict:
+@limiter.limit("10/minute")
+async def login(
+    request: Request,
+    body: LoginRequest,
+    response: Response,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+) -> dict:
     user_id = await authenticate_user(body.email, body.password)
-    token = await issue_session(response, user_id)
-    return {"data": {"user_id": user_id, "session_token": token}}
+    await issue_session(response, user_id, replaced_token=session_cookie)
+    return {"data": {"user_id": user_id}}
+
+
+@router.post("/logout")
+async def logout(
+    response: Response,
+    auth: Annotated[AuthContext, Depends(require_auth)],
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+) -> dict:
+    if session_cookie:
+        await revoke_session(session_cookie)
+    response.delete_cookie(key=SESSION_COOKIE, httponly=True, samesite="lax", secure=get_settings().app_env != "development")
+    return {"data": {"logged_out": True}}
 
 
 @router.get("/me")

@@ -17,7 +17,7 @@ docker compose down           # Stop services
 python3 scripts/check_local_stack.py   # Verify infrastructure readiness
 python3 scripts/init_local_db.py       # Initialize database schema
 pip install -e ".[dev]"                # Install Python dependencies
-cd web && bun install && cd ..         # Install frontend dependencies
+pnpm --dir web install                 # Install frontend dependencies
 python3 scripts/dev_stack.py           # Start all 5 services concurrently
 
 # Individual services
@@ -25,16 +25,16 @@ uvicorn services.platform_api.app.main:app --reload --host 0.0.0.0 --port 8000  
 python -m services.compiler_worker.app.main                                        # Compiler Worker
 uvicorn services.mcp_service.app.main:app --reload --host 0.0.0.0 --port 8080    # MCP Service
 uvicorn services.converter_service.app.main:app --reload --host 0.0.0.0 --port 8090  # Converter
-cd web && bun dev                      # Frontend dev server
+pnpm --dir web dev                     # Frontend dev server
 
 # Testing
 pytest tests/unit tests/integration    # Run all tests
 ruff check .                           # Lint Python code
 
 # Frontend
-cd web && bun dev              # Dev server (http://localhost:3000)
-cd web && bun run build        # Production build
-cd web && bun run lint         # TypeScript check
+pnpm --dir web dev             # Dev server (http://localhost:3000)
+pnpm --dir web run build       # Production build
+pnpm --dir web run lint        # TypeScript check
 ```
 
 ## Tech Stack
@@ -44,12 +44,12 @@ cd web && bun run lint         # TypeScript check
 | Backend | Python 3.11+ / FastAPI / asyncpg |
 | Database | PostgreSQL + pgvector + pgroonga + pg_trgm |
 | Storage | MinIO (S3-compatible) |
-| Queue | Redis (List-based RPUSH/BLPOP) |
+| Queue | Redis Streams + Consumer Groups |
 | LLM | OpenAI / Anthropic / DeepSeek / SiliconFlow (configurable per workspace) |
 | Embedding | Configurable per workspace (1024-dim vectors) |
 | Frontend | Next.js 15 / React 19 / Tailwind CSS v4 / next-intl |
 | MCP | FastMCP (Streamable HTTP) |
-| Package Manager | pip (Python) / bun (Frontend) |
+| Package Manager | pip (Python) / pnpm (Frontend) |
 | Docker | docker compose (never docker-compose) |
 
 ## Architecture
@@ -118,11 +118,11 @@ llm-wiki/
 ├── shared/python/llm_wiki_core/   # Shared Python core library
 │   ├── config.py                  # pydantic-settings configuration
 │   ├── db.py                      # asyncpg connection pool
-│   ├── queue.py                   # Redis queue (enqueue_run / pop_run / publish_event)
+│   ├── queue.py                   # Redis Streams queue (enqueue_run / pop_run / publish_event)
 │   ├── llm.py                     # LLM invocation (OpenAI-compatible + Anthropic)
 │   ├── embeddings.py              # Embedding generation via HTTP API
 │   ├── parsing.py                 # Document parsing (PDF, DOCX, XLSX, CSV, MD, HTML)
-│   ├── security.py                # JWT, bcrypt password hashing, agent token generation
+│   ├── security.py                # Opaque sessions, bcrypt password hashing, agent token generation
 │   ├── storage.py                 # MinIO object storage
 │   ├── audit.py                   # Activity event logging
 │   ├── change_plan.py             # Change plan data structure
@@ -144,15 +144,14 @@ llm-wiki/
 │   ├── lib/                       # API client, utilities
 │   ├── i18n/                      # Internationalization config
 │   └── messages/                  # i18n translation files
-├── db/migrations/                 # SQL migration files
-│   └── 001_vnext_schema.sql       # Full schema DDL
+├── alembic/                       # Active Alembic migrations
+├── docs/archive/db-migrations-legacy/  # Archived legacy SQL migration snapshots
 ├── scripts/                       # Development utilities
 │   ├── dev_stack.py               # Start all services concurrently
 │   ├── check_local_stack.py       # Verify infrastructure
 │   └── init_local_db.py           # Initialize database
 ├── tests/                         # Test suite
 ├── docker-compose.yml             # Dev infrastructure
-├── docker-compose.prod.yml        # Production deployment
 └── pyproject.toml                 # Python project config
 ```
 
@@ -169,8 +168,8 @@ llm-wiki/
 User uploads file via Documents API
  → File stored in MinIO, document record created (status=draft)
  → Run created (type=ingest, status=queued)
- → Run ID pushed to Redis queue (RPUSH llm-wiki:runs)
- → Compiler Worker polls queue (BLPOP)
+ → Run ID pushed to Redis stream
+ → Compiler Worker consumer group polls stream
  → Pipeline: parse document → split blocks → generate embeddings → LLM extract entities/claims/relations
  → Write to DB: document_pages, document_blocks (with vectors), entities, claims, relations, citations
  → Build change plan → create/update wiki documents with revisions
@@ -193,7 +192,7 @@ User query → Platform API /search endpoint
 | Table | Purpose |
 |-------|---------|
 | `users` | User accounts (email + bcrypt password) |
-| `sessions` | JWT session tokens |
+| `sessions` | Opaque session token hashes |
 | `organizations` | Tenant organizations |
 | `organization_members` | User ↔ Organization membership (role-based) |
 | `workspaces` | Isolated knowledge bases within organizations |
@@ -225,7 +224,7 @@ AI agents connect via the Model Context Protocol:
 ### Key Design Decisions
 
 - **Per-workspace configuration**: LLM provider, model, API key, embedding config, compiler rules, and search rules are all stored per-workspace in the database — NOT in environment variables
-- **Redis List queue**: Simple RPUSH/BLPOP pattern instead of BullMQ/Celery for job queue
+- **Redis Streams queue**: Consumer groups + retry + DLQ for reliable job processing
 - **Raw SQL via asyncpg**: No ORM — all database operations use parameterized SQL queries directly
 - **Embedding normalization**: All embeddings are L2-normalized to unit vectors after generation
 - **Idempotent entity upsert**: Entities are upserted by (workspace_id, slug) with longer-wins logic for title/summary
@@ -234,18 +233,18 @@ AI agents connect via the Model Context Protocol:
 
 See `.env.example`. Only infrastructure connection details are configured via env. LLM/embedding provider/model/key selection is done per-workspace in the Settings page.
 
-Required: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `AGENT_TOKEN_SECRET`
-Optional: `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `EMBEDDING_DIMENSIONS`
+Required: `DATABASE_URL`, `REDIS_URL`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `ACTIVE_KEY_VERSION`, `KEYRING_JSON`
+Optional: `EMBEDDING_DIMENSIONS`
 
 ## Important Conventions
 
-- **Package manager**: pip for Python, bun for frontend
+- **Package manager**: pip for Python, pnpm for frontend
 - **Docker**: Always `docker compose`, never `docker-compose`
 - **Python path**: Services import shared code via `llm_wiki_core` package (installed via `pip install -e .`)
 - **PYTHONPATH**: Must include both project root and `shared/python/` (handled by `dev_stack.py`)
 - **Database**: Raw asyncpg queries with `$1::uuid` parameter casting — no ORM
 - **JSON serialization**: `orjson` for high-performance JSON encoding/decoding
-- **Auth**: JWT tokens via `PyJWT`, passwords via `bcrypt`
+- **Auth**: Opaque session tokens via DB-backed hashes, passwords via `bcrypt`
 - **Agent tokens**: Prefixed with `lwa_`, stored as SHA-256 hash
 - **Embedding dimensions**: Fixed at 1024 (configurable via `EMBEDDING_DIMENSIONS` env)
 - **Frontend i18n**: next-intl with translation files in `web/messages/`

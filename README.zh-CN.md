@@ -35,7 +35,7 @@
 | 后端 | Python 3.11+ / FastAPI / asyncpg |
 | 数据库 | PostgreSQL 18 + pgvector + pgroonga |
 | 对象存储 | MinIO (S3 兼容) |
-| 队列 | Redis（List 模式） |
+| 队列 | Redis Streams + Consumer Groups |
 | LLM | OpenAI / Anthropic / DeepSeek / SiliconFlow（按 Workspace 配置） |
 | Embedding | 按 Workspace 配置（1024 维向量） |
 | 前端 | Next.js 15 / React 19 / Tailwind CSS v4 / shadcn/ui |
@@ -45,19 +45,19 @@
 
 ```bash
 # 1. 启动基础设施
-docker compose up -d
+docker compose up -d postgres redis minio
 
 # 2. 检查依赖
 python3 scripts/check_local_stack.py
 
 # 3. 初始化数据库
-python3 scripts/init_local_db.py
+python3 scripts/init_local_db.py --reset
 
 # 4. 安装 Python 依赖
 pip install -e ".[dev]"
 
 # 5. 安装前端依赖
-cd web && bun install && cd ..
+pnpm --dir web install
 
 # 6. 启动所有服务
 python3 scripts/dev_stack.py
@@ -93,8 +93,11 @@ AI Agent 通过 MCP 协议连接，使用 Workspace 级别的 Token：
 
 ```bash
 pytest tests/unit tests/integration
+bash scripts/run_local_checks.sh
 ```
 
 ## 环境变量
 
 参见 `.env.example`。仅基础设施连接信息通过环境变量配置。Provider/Model 选择在 Settings 页面按 Workspace 配置。
+
+数据库初始化只走 Alembic。旧 SQL 补丁仅作为历史参考归档，不再参与当前初始化流程。

@@ -7,6 +7,9 @@ from dataclasses import dataclass
 
 from openai import AsyncOpenAI
 
+from .metrics import LLM_CALLS_TOTAL, LLM_DURATION
+from .tracing import traced_span
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,14 +79,32 @@ async def invoke_structured(
     if not config.api_key:
         raise RuntimeError(f"LLM API key not configured for provider '{config.provider}'")
 
+    import time
+
+    start = time.perf_counter()
     try:
-        if config.provider == "anthropic":
-            text = await _call_anthropic(config, system, prompt, timeout_seconds)
-        else:
-            text = await _call_openai_compatible(config, system, prompt, timeout_seconds)
+        with traced_span(
+            "llm.invoke",
+            tracer_name="llm",
+            attributes={
+                "llm.provider": config.provider,
+                "llm.model": config.model,
+                "llm.timeout_seconds": timeout_seconds,
+            },
+        ):
+            if config.provider == "anthropic":
+                text = await _call_anthropic(config, system, prompt, timeout_seconds)
+            else:
+                text = await _call_openai_compatible(config, system, prompt, timeout_seconds)
+        LLM_CALLS_TOTAL.labels(provider=config.provider, model=config.model, status="succeeded").inc()
+        LLM_DURATION.labels(provider=config.provider, model=config.model).observe(time.perf_counter() - start)
         return _extract_json(text)
     except RuntimeError:
+        LLM_CALLS_TOTAL.labels(provider=config.provider, model=config.model, status="failed").inc()
+        LLM_DURATION.labels(provider=config.provider, model=config.model).observe(time.perf_counter() - start)
         raise
     except Exception as exc:
+        LLM_CALLS_TOTAL.labels(provider=config.provider, model=config.model, status="failed").inc()
+        LLM_DURATION.labels(provider=config.provider, model=config.model).observe(time.perf_counter() - start)
         logger.exception("LLM invocation failed (provider=%s, model=%s)", config.provider, config.model)
         raise RuntimeError(f"LLM call failed ({config.provider}/{config.model}): {exc}") from exc

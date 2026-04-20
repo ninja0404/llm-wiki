@@ -6,6 +6,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app:/app/shared/python
 
 COPY pyproject.toml /app/pyproject.toml
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
+COPY scripts /app/scripts
 COPY shared/python /app/shared/python
 COPY services /app/services
 

@@ -7,8 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from ...core.deps import AuthContext, require_workspace_access
-from llm_wiki_core.db import get_db_pool
+from ...core.deps import AuthContext, get_workspace_conn, require_workspace_access
 
 
 router = APIRouter(tags=["exports"])
@@ -18,9 +17,9 @@ router = APIRouter(tags=["exports"])
 async def export_markdown(
     workspace_id: str,
     auth: Annotated[AuthContext, Depends(require_workspace_access)],
+    connection=Depends(get_workspace_conn),
 ) -> StreamingResponse:
-    pool = await get_db_pool()
-    rows = await pool.fetch(
+    rows = await connection.fetch(
         """
         SELECT d.path, dr.content_md
         FROM documents d

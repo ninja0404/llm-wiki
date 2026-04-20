@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, FormEvent, useCallback } from "react";
 import { Check, Copy, Key, Plus, Server, Trash2, Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { getApiUrl } from "@/lib/api";
+import { clientApiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/src/components/ui/card";
 import { Input } from "@/src/components/ui/input";
 import { Button } from "@/src/components/ui/button";
@@ -80,17 +80,24 @@ function ProviderSelect({ value, options, onChange }: { value: string; options: 
 interface Workspace { id: string; name: string; slug: string; role: string; }
 interface CompilerRules { max_entities: number; min_confidence: number; text_truncation_limit: number; custom_instructions: string; }
 interface SearchRules { default_limit: number; graph_boost_weight: number; min_score: number; enable_semantic: boolean; }
-interface WorkspaceSettings { llm_provider: string; llm_model: string; llm_api_key: string; llm_base_url: string; embedding_provider: string; embedding_model: string; embedding_api_key: string; embedding_base_url: string; compiler_rules: CompilerRules; search_rules: SearchRules; }
+interface WorkspaceSettings {
+  llm_provider: string;
+  llm_model: string;
+  llm_api_key_masked: string | null;
+  llm_api_key_key_version: string | null;
+  llm_base_url: string;
+  embedding_provider: string;
+  embedding_model: string;
+  embedding_api_key_masked: string | null;
+  embedding_api_key_key_version: string | null;
+  embedding_base_url: string;
+  compiler_rules: CompilerRules;
+  search_rules: SearchRules;
+}
 
 const DEFAULT_COMPILER_RULES: CompilerRules = { max_entities: 20, min_confidence: 0.5, text_truncation_limit: 12000, custom_instructions: "" };
 const DEFAULT_SEARCH_RULES: SearchRules = { default_limit: 20, graph_boost_weight: 0.15, min_score: 0, enable_semantic: true };
 interface AgentToken { id: string; name: string; token_prefix: string; scope: string; last_used_at: string | null; created_at: string; }
-
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(`${getApiUrl()}${path}`, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers as Record<string, string> ?? {}) }, credentials: "include" });
-  if (!r.ok) { const p = await r.json().catch(() => ({})); throw new Error(p.detail ?? "Request failed"); }
-  return r.json();
-}
 
 const scopeColors: Record<string, string> = {
   read: "bg-slate-100 text-slate-700",
@@ -107,6 +114,8 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
   const [tokens, setTokens] = useState<AgentToken[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [llmApiKeyInput, setLlmApiKeyInput] = useState("");
+  const [embeddingApiKeyInput, setEmbeddingApiKeyInput] = useState("");
 
   const [newTokenName, setNewTokenName] = useState("");
   const [newTokenScope, setNewTokenScope] = useState("write");
@@ -117,13 +126,15 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
   const loadData = useCallback(async () => {
     if (!activeWsId) return;
     const [s, t] = await Promise.all([
-      api<{ data: WorkspaceSettings }>(`/v1/workspaces/${activeWsId}/settings`).catch(() => ({ data: null })),
-      api<{ data: AgentToken[] }>(`/v1/workspaces/${activeWsId}/agent-tokens`).catch(() => ({ data: [] })),
+      clientApiFetch<{ data: WorkspaceSettings }>(`/v1/workspaces/${activeWsId}/settings`).catch(() => ({ data: null })),
+      clientApiFetch<{ data: AgentToken[] }>(`/v1/workspaces/${activeWsId}/agent-tokens`).catch(() => ({ data: [] })),
     ]);
     if (s.data) {
       s.data.compiler_rules = { ...DEFAULT_COMPILER_RULES, ...(s.data.compiler_rules || {}) };
       s.data.search_rules = { ...DEFAULT_SEARCH_RULES, ...(s.data.search_rules || {}) };
       setSettings(s.data);
+      setLlmApiKeyInput("");
+      setEmbeddingApiKeyInput("");
     }
     setTokens(t.data);
   }, [activeWsId]);
@@ -136,8 +147,16 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
     setSaving(true);
     setSaveMsg("");
     try {
-      await api(`/v1/workspaces/${activeWsId}/settings`, { method: "PUT", body: JSON.stringify(settings) });
+      const payload = {
+        ...settings,
+        llm_api_key: llmApiKeyInput.trim() || null,
+        embedding_api_key: embeddingApiKeyInput.trim() || null,
+      };
+      await clientApiFetch(`/v1/workspaces/${activeWsId}/settings`, { method: "PUT", body: JSON.stringify(payload) });
       setSaveMsg("Settings saved.");
+      setLlmApiKeyInput("");
+      setEmbeddingApiKeyInput("");
+      await loadData();
     } catch (err: unknown) {
       setSaveMsg(err instanceof Error ? err.message : "Save failed");
     }
@@ -149,7 +168,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
     if (!newTokenName.trim() || !activeWsId) return;
     setCreatingToken(true);
     try {
-      const res = await api<{ data: { token: string } }>(`/v1/workspaces/${activeWsId}/agent-tokens`, {
+      const res = await clientApiFetch<{ data: { token: string } }>(`/v1/workspaces/${activeWsId}/agent-tokens`, {
         method: "POST",
         body: JSON.stringify({ name: newTokenName.trim(), scope: newTokenScope }),
       });
@@ -162,7 +181,7 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
 
   async function handleRevoke(tokenId: string) {
     if (!activeWsId) return;
-    await api(`/v1/workspaces/${activeWsId}/agent-tokens/${tokenId}`, { method: "DELETE" }).catch(() => {});
+    await clientApiFetch(`/v1/workspaces/${activeWsId}/agent-tokens/${tokenId}`, { method: "DELETE" }).catch(() => {});
     await loadData();
   }
 
@@ -224,7 +243,15 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700">{t("apiKey")}</label>
-                      <Input type="password" value={settings.llm_api_key} onChange={(e) => setSettings({ ...settings, llm_api_key: e.target.value })} placeholder="sk-..." />
+                      <Input
+                        type="password"
+                        value={llmApiKeyInput}
+                        onChange={(e) => setLlmApiKeyInput(e.target.value)}
+                        placeholder={settings.llm_api_key_masked ?? "Set a new API key"}
+                      />
+                      <p className="text-xs text-slate-400">
+                        {settings.llm_api_key_key_version ? `Stored with key version ${settings.llm_api_key_key_version}` : "No API key stored"}
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -255,7 +282,15 @@ export function SettingsPanel({ workspaces }: { workspaces: Workspace[] }) {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700">{t("apiKey")}</label>
-                      <Input type="password" value={settings.embedding_api_key} onChange={(e) => setSettings({ ...settings, embedding_api_key: e.target.value })} placeholder="sk-..." />
+                      <Input
+                        type="password"
+                        value={embeddingApiKeyInput}
+                        onChange={(e) => setEmbeddingApiKeyInput(e.target.value)}
+                        placeholder={settings.embedding_api_key_masked ?? "Set a new API key"}
+                      />
+                      <p className="text-xs text-slate-400">
+                        {settings.embedding_api_key_key_version ? `Stored with key version ${settings.embedding_api_key_key_version}` : "No API key stored"}
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-1.5">

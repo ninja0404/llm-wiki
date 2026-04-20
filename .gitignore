@@ -12,6 +12,7 @@ dist/
 build/
 .DS_Store
 *.log
+*.tsbuildinfo
 minio-data/
 tmp/
 *.pdf

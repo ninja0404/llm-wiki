@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
 import sys
 
@@ -16,7 +15,7 @@ if str(ROOT) not in sys.path:
 if str(SHARED_PYTHON) not in sys.path:
     sys.path.insert(0, str(SHARED_PYTHON))
 
-from llm_wiki_core.config import get_settings
+from llm_wiki_core.config import get_settings  # noqa: E402
 
 
 async def check_postgres(settings) -> str | None:
