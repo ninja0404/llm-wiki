@@ -135,6 +135,32 @@ services:
       ACTIVE_KEY_VERSION: ${ACTIVE_KEY_VERSION}
       KEYRING_JSON: ${KEYRING_JSON}
 
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+    command: --model-id BAAI/bge-m3 --port 8085
+    ports:
+      - "${TEI_PORT:-8085}:8085"
+    volumes:
+      - tei-models:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8085/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  tei-reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+    command: --model-id BAAI/bge-reranker-v2-m3 --port 8086
+    ports:
+      - "${TEI_RERANKER_PORT:-8086}:8086"
+    volumes:
+      - tei-reranker-models:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8086/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
   web:
     build:
       context: .
@@ -155,3 +181,5 @@ volumes:
   pgdata:
   redisdata:
   miniodata:
+  tei-models:
+  tei-reranker-models:

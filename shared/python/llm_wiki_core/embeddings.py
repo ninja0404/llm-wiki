@@ -35,23 +35,47 @@ async def generate_embedding(text: str, config: EmbeddingConfig) -> list[float]:
         raise RuntimeError(
             f"Embedding API not configured: api_key and base_url are required (model={config.model})"
         )
-    return await _api_embedding(config.base_url, config.api_key, config.model, text, config.dimensions)
+    results = await _api_embedding(config.base_url, config.api_key, config.model, [text[:8000]], config.dimensions)
+    return results[0]
+
+
+async def generate_embeddings_batch(
+    texts: list[str],
+    config: EmbeddingConfig,
+    batch_size: int = 64,
+) -> list[list[float]]:
+    """Batch embedding — splits *texts* into groups of *batch_size* and
+    calls the API once per batch, dramatically reducing HTTP overhead.
+    """
+    if not config.api_key or not config.base_url:
+        raise RuntimeError("Embedding API not configured")
+    if not texts:
+        return []
+
+    results: list[list[float]] = []
+    for start in range(0, len(texts), batch_size):
+        chunk = [t[:8000] for t in texts[start : start + batch_size]]
+        batch_vectors = await _api_embedding(
+            config.base_url, config.api_key, config.model, chunk, config.dimensions,
+        )
+        results.extend(batch_vectors)
+    return results
 
 
 async def _api_embedding(
     base_url: str,
     api_key: str,
     model: str,
-    text: str,
+    inputs: list[str],
     dimensions: int,
-) -> list[float]:
+) -> list[list[float]]:
     import time
 
     url = f"{base_url.rstrip('/')}/embeddings"
     client = _get_http_client()
     body: dict = {
         "model": model,
-        "input": text[:8000],
+        "input": inputs if len(inputs) > 1 else inputs[0],
     }
     if "bge" not in model.lower():
         body["dimensions"] = dimensions
@@ -61,7 +85,7 @@ async def _api_embedding(
         with traced_span(
             "embedding.invoke",
             tracer_name="embedding",
-            attributes={"embedding.model": model, "embedding.dimensions": dimensions},
+            attributes={"embedding.model": model, "embedding.dimensions": dimensions, "embedding.batch_size": len(inputs)},
         ):
             response = await client.post(
                 url,
@@ -70,7 +94,10 @@ async def _api_embedding(
             )
             response.raise_for_status()
             data = response.json()
-            vector: list[float] = data["data"][0]["embedding"]
+
+            raw_items = sorted(data["data"], key=lambda x: x.get("index", 0))
+            vectors: list[list[float]] = [item["embedding"] for item in raw_items]
+
         EMBEDDING_CALLS_TOTAL.labels(model=model, status="succeeded").inc()
         EMBEDDING_DURATION.labels(model=model).observe(time.perf_counter() - start)
     except Exception:
@@ -78,10 +105,13 @@ async def _api_embedding(
         EMBEDDING_DURATION.labels(model=model).observe(time.perf_counter() - start)
         raise
 
-    if len(vector) > dimensions:
-        vector = vector[:dimensions]
-    elif len(vector) < dimensions:
-        vector.extend([0.0] * (dimensions - len(vector)))
+    normalized: list[list[float]] = []
+    for vector in vectors:
+        if len(vector) > dimensions:
+            vector = vector[:dimensions]
+        elif len(vector) < dimensions:
+            vector = vector + [0.0] * (dimensions - len(vector))
 
-    norm = math.sqrt(sum(v * v for v in vector)) or 1.0
-    return [v / norm for v in vector]
+        norm = math.sqrt(sum(v * v for v in vector)) or 1.0
+        normalized.append([v / norm for v in vector])
+    return normalized

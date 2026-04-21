@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import html
 import os
 import re
@@ -16,7 +17,7 @@ from llm_wiki_core.change_plan import ChangeAction, ChangePlan
 from llm_wiki_core.config import get_settings
 from llm_wiki_core.crypto import decrypt_value
 from llm_wiki_core.db import acquire
-from llm_wiki_core.embeddings import EmbeddingConfig, generate_embedding
+from llm_wiki_core.embeddings import EmbeddingConfig, generate_embedding, generate_embeddings_batch
 from llm_wiki_core.llm import LLMConfig, invoke_structured
 from llm_wiki_core.markdown_ops import append_markdown
 from llm_wiki_core.metrics import CONVERTER_CALLS_TOTAL, CONVERTER_DURATION
@@ -28,6 +29,54 @@ from llm_wiki_core.write_journal import append_run_step, create_document, create
 
 logger = logging.getLogger(__name__)
 CONVERTIBLE_SOURCE_EXTENSIONS = {"doc", "ppt", "pptx"}
+
+CONTEXT_HEADER_SYSTEM = (
+    "You are a document analysis assistant. Given a document title, a brief "
+    "summary of the document, and one chunk of text from it, write a short "
+    "1-2 sentence header that names the key entities relevant to this chunk "
+    "and ties it back to the document. Output ONLY the header text, nothing else."
+)
+
+
+def _block_content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def _generate_context_headers(
+    document_title: str,
+    blocks: list[dict],
+    llm_config: LLMConfig,
+    concurrency: int = 6,
+) -> list[str | None]:
+    """Generate a context header for each block using the workspace LLM.
+
+    Returns a list aligned with *blocks*. On per-block failure the entry
+    is ``None`` — the caller should treat it as "no header".
+    """
+    sem = asyncio.Semaphore(concurrency)
+    doc_summary = blocks[0]["text"][:300] if blocks else document_title
+
+    async def _one(block: dict) -> str | None:
+        prompt = (
+            f"Document: {document_title}\n"
+            f"Document summary: {doc_summary}\n\n"
+            f"Chunk text:\n{block['text'][:1500]}"
+        )
+        async with sem:
+            try:
+                result = await invoke_structured(
+                    CONTEXT_HEADER_SYSTEM, prompt, config=llm_config, timeout_seconds=30,
+                )
+                if isinstance(result, str):
+                    return result.strip()[:500]
+                if isinstance(result, dict):
+                    return (result.get("header") or result.get("text") or "")[:500]
+            except Exception:
+                logger.debug("context header generation failed for block", exc_info=True)
+        return None
+
+    tasks = [_one(b) for b in blocks]
+    return list(await asyncio.gather(*tasks))
 
 
 def _slugify(value: str) -> str:
@@ -51,24 +100,42 @@ def _vector_literal(values: list[float]) -> str:
     return "[" + ",".join(f"{value:.8f}" for value in values) + "]"
 
 
+def _find_bbox_for_text(text: str, paragraphs: list[dict]) -> dict:
+    """Match block text to a parsed paragraph's bbox via word overlap."""
+    if not paragraphs or not text:
+        return {}
+    text_words = set(text.lower().split()[:15])
+    best, best_overlap = {}, 0
+    for para in paragraphs:
+        para_words = set(para.get("text", "").lower().split()[:15])
+        overlap = len(text_words & para_words)
+        if overlap > best_overlap:
+            best, best_overlap = para.get("bbox", {}), overlap
+    if best_overlap >= 3:
+        return {"bbox": best} if isinstance(best, list) else best
+    return {}
+
+
 def _split_blocks(document: ParsedDocument) -> list[dict]:
     blocks: list[dict] = []
     for page in document.pages:
         headings: list[str] = []
         paragraph_lines: list[str] = []
+        page_paragraphs = (page.elements or {}).get("paragraphs", [])
 
         def flush_paragraph() -> None:
             if not paragraph_lines:
                 return
             text = "\n".join(paragraph_lines).strip()
             if text:
+                bbox = _find_bbox_for_text(text, page_paragraphs)
                 blocks.append(
                     {
                         "page_no": page.page_no,
                         "block_type": "table" if "|" in text and "---" in text else "paragraph",
                         "heading_path": list(headings),
                         "text": text,
-                        "bbox": {},
+                        "bbox": bbox,
                         "token_count": len(text.split()),
                     }
                 )
@@ -87,7 +154,7 @@ def _split_blocks(document: ParsedDocument) -> list[dict]:
                         "block_type": "heading",
                         "heading_path": list(headings),
                         "text": heading,
-                        "bbox": {},
+                        "bbox": _find_bbox_for_text(heading, page_paragraphs),
                         "token_count": len(heading.split()),
                     }
                 )
@@ -579,10 +646,31 @@ async def process_run(run_id: str, workspace_id: str, attempts: int = 1) -> None
     await _record_step(run_id, workspace_id, "extract", "succeeded", {
         "entities": len(entities), "claims": len(claims), "relations": len(relations),
     })
-    block_embeddings = []
+    for idx, block in enumerate(blocks):
+        block["chunk_idx"] = idx
+        block["content_hash"] = _block_content_hash(block["text"])
+
+    context_headers: list[str | None] = [None] * len(blocks)
+    try:
+        context_headers = await _generate_context_headers(
+            parsed.title, blocks, llm_config,
+        )
+    except Exception:
+        logger.warning("context header generation skipped", exc_info=True)
+    for i, header in enumerate(context_headers):
+        blocks[i]["context_header"] = header
+
+    # Batch embedding — text = context_header + block text when header available
+    embed_texts = []
     for block in blocks:
-        embedding = await generate_embedding(block["text"], embedding_config)
-        block_embeddings.append({"block": block, "embedding": embedding})
+        header = block.get("context_header") or ""
+        text = f"{header}\n\n{block['text']}" if header else block["text"]
+        embed_texts.append(text)
+    all_embeddings = await generate_embeddings_batch(embed_texts, embedding_config)
+    block_embeddings = [
+        {"block": block, "embedding": emb}
+        for block, emb in zip(blocks, all_embeddings)
+    ]
 
     plan = _build_change_plan(workspace["name"], source_document, parsed, entities, claims, relations, blocks)
     await record_activity(
@@ -610,7 +698,25 @@ async def process_run(run_id: str, workspace_id: str, attempts: int = 1) -> None
             )
             await set_document_revision(connection, document_id, source_revision.id)
             await connection.execute("DELETE FROM document_pages WHERE document_id = $1::uuid", document_id)
-            await connection.execute("DELETE FROM document_blocks WHERE document_id = $1::uuid", document_id)
+
+            existing_blocks = await connection.fetch(
+                "SELECT chunk_idx, content_hash FROM document_blocks WHERE document_id = $1::uuid AND chunk_idx IS NOT NULL",
+                document_id,
+            )
+            existing_hash_map = {row["chunk_idx"]: row["content_hash"] for row in existing_blocks}
+            new_chunk_idxs = {b["chunk_idx"] for b in blocks}
+            stale_idxs = set(existing_hash_map.keys()) - new_chunk_idxs
+            if stale_idxs:
+                await connection.execute(
+                    "DELETE FROM document_blocks WHERE document_id = $1::uuid AND chunk_idx = ANY($2::int[])",
+                    document_id,
+                    list(stale_idxs),
+                )
+            if not existing_hash_map:
+                await connection.execute(
+                    "DELETE FROM document_blocks WHERE document_id = $1::uuid AND chunk_idx IS NULL",
+                    document_id,
+                )
             await connection.execute(
                 "DELETE FROM claims WHERE id IN (SELECT claim_id FROM citations WHERE source_document_id = $1::uuid)",
                 document_id,
@@ -652,12 +758,37 @@ async def process_run(run_id: str, workspace_id: str, attempts: int = 1) -> None
                 )
 
             block_rows = []
+            skipped_unchanged = 0
             for item in block_embeddings:
                 block = item["block"]
+                chunk_idx = block["chunk_idx"]
+                old_hash = existing_hash_map.get(chunk_idx)
+
+                if old_hash and old_hash == block["content_hash"]:
+                    row = await connection.fetchrow(
+                        "SELECT id::text AS id, page_no FROM document_blocks WHERE document_id = $1::uuid AND chunk_idx = $2",
+                        document_id, chunk_idx,
+                    )
+                    if row:
+                        block_rows.append({"id": row["id"], "page_no": row["page_no"], "text": block["text"]})
+                        skipped_unchanged += 1
+                        continue
+
                 block_row = await connection.fetchrow(
                     """
-                    INSERT INTO document_blocks (document_id, page_no, block_type, heading_path, text, bbox, token_count, embedding)
-                    VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb, $7, $8::vector)
+                    INSERT INTO document_blocks (document_id, page_no, block_type, heading_path, text, bbox, token_count, embedding, chunk_idx, content_hash, context_header)
+                    VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb, $7, $8::vector, $9, $10, $11)
+                    ON CONFLICT (document_id, chunk_idx) WHERE chunk_idx IS NOT NULL
+                    DO UPDATE SET
+                        page_no = EXCLUDED.page_no,
+                        block_type = EXCLUDED.block_type,
+                        heading_path = EXCLUDED.heading_path,
+                        text = EXCLUDED.text,
+                        bbox = EXCLUDED.bbox,
+                        token_count = EXCLUDED.token_count,
+                        embedding = EXCLUDED.embedding,
+                        content_hash = EXCLUDED.content_hash,
+                        context_header = EXCLUDED.context_header
                     RETURNING id::text AS id, page_no
                     """,
                     document_id,
@@ -668,8 +799,13 @@ async def process_run(run_id: str, workspace_id: str, attempts: int = 1) -> None
                     orjson.dumps(block["bbox"]).decode(),
                     block["token_count"],
                     _vector_literal(item["embedding"]),
+                    chunk_idx,
+                    block["content_hash"],
+                    block.get("context_header"),
                 )
                 block_rows.append({"id": block_row["id"], "page_no": block_row["page_no"], "text": block["text"]})
+            if skipped_unchanged:
+                logger.info("incremental ingest: %d/%d blocks unchanged, skipped re-embedding", skipped_unchanged, len(blocks))
 
             fallback_block = next((row for row in block_rows if row["text"].strip()), {"id": None, "page_no": 1, "text": ""})
 

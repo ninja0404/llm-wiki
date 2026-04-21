@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from .config import get_settings
 from .crypto import decrypt_value
 from .embeddings import EmbeddingConfig, generate_embedding
+
+logger = logging.getLogger(__name__)
+
+RRF_K = 60
 
 
 @dataclass(slots=True)
@@ -18,6 +23,35 @@ def _vector_literal(values: list[float]) -> str:
     return "[" + ",".join(f"{value:.8f}" for value in values) + "]"
 
 
+def _rrf_fuse(channels: list[list[dict]], k: int = RRF_K) -> list[dict]:
+    """Reciprocal Rank Fusion across multiple retrieval channels.
+
+    Each channel is an independently ranked list. For each item the RRF
+    score from channel *c* is ``1 / (k + rank)`` where rank is 1-based.
+    Scores are summed across channels, and the item dict with the highest
+    raw score is kept as representative (for snippet / metadata).
+    """
+    scores: dict[str, float] = {}
+    best: dict[str, dict] = {}
+
+    for channel in channels:
+        for rank, item in enumerate(channel, start=1):
+            item_id = item["id"]
+            rrf_score = 1.0 / (k + rank)
+            scores[item_id] = scores.get(item_id, 0.0) + rrf_score
+            prev = best.get(item_id)
+            if prev is None or (item.get("score") or 0) > (prev.get("score") or 0):
+                best[item_id] = item
+
+    merged: list[dict] = []
+    for item_id, rrf_score in scores.items():
+        entry = dict(best[item_id])
+        entry["score"] = rrf_score
+        merged.append(entry)
+    merged.sort(key=lambda x: x["score"], reverse=True)
+    return merged
+
+
 def get_search_rules(raw: dict | None) -> dict:
     rules = raw or {}
     return {
@@ -25,6 +59,8 @@ def get_search_rules(raw: dict | None) -> dict:
         "graph_boost_weight": max(0.0, min(float(rules.get("graph_boost_weight", 0.15)), 1.0)),
         "min_score": max(0.0, min(float(rules.get("min_score", 0)), 1.0)),
         "enable_semantic": bool(rules.get("enable_semantic", True)),
+        "enable_reranker": bool(rules.get("enable_reranker", True)),
+        "reranker_url": str(rules.get("reranker_url", "")),
     }
 
 
@@ -138,14 +174,13 @@ async def hybrid_search_workspace(
             query_embedding,
         ))
 
-    merged = [dict(row) for row in lexical] + [dict(row) for row in semantic_results] + [dict(row) for row in wiki_docs] + [dict(row) for row in entities]
-    deduped: dict[tuple[str, str | int | None], dict] = {}
-    for item in merged:
-        key = (item["path"], item.get("page_no"))
-        existing = deduped.get(key)
-        if existing is None or (item.get("score") or 0) > (existing.get("score") or 0):
-            deduped[key] = item
-    ranked = list(deduped.values())
+    channels: list[list[dict]] = [
+        [dict(row) for row in lexical],
+        [dict(row) for row in semantic_results],
+        [dict(row) for row in wiki_docs],
+        [dict(row) for row in entities],
+    ]
+    ranked = _rrf_fuse(channels)
 
     graph_weights = await connection.fetch(
         """
@@ -170,4 +205,13 @@ async def hybrid_search_workspace(
         ranked = [item for item in ranked if (item.get("score") or 0) >= min_score]
 
     ranked.sort(key=lambda item: item.get("score") or 0, reverse=True)
-    return WorkspaceSearchResult(items=ranked[:effective_limit], search_rules=search_rules)
+    candidates = ranked[:effective_limit]
+
+    if search_rules["enable_reranker"] and candidates:
+        from .reranker import rerank
+        try:
+            candidates = rerank(query, candidates, search_rules)
+        except Exception:
+            logger.warning("reranker failed, using RRF order", exc_info=True)
+
+    return WorkspaceSearchResult(items=candidates, search_rules=search_rules)
