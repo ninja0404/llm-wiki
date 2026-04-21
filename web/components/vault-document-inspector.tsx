@@ -6,6 +6,7 @@ import { FileText, GitBranch, Link2, MessageSquareQuote } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { clientApiFetch } from "@/lib/api";
+import { MarkdownContent } from "@/components/markdown-content";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table";
 import { Badge } from "@/src/components/ui/badge";
@@ -120,9 +121,7 @@ export function VaultDocumentInspector({
             <CardTitle>{t("latestContent")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="bg-slate-900 text-slate-100 rounded-lg p-4 font-mono text-sm leading-relaxed overflow-auto max-h-64 whitespace-pre-wrap">
-              {document.content_md || "(empty)"}
-            </div>
+            <MarkdownContent content={document.content_md} className="max-h-80 overflow-auto rounded-lg border border-slate-200 bg-white p-4" />
           </CardContent>
         </Card>
       </div>

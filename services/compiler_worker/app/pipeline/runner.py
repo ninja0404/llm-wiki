@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import os
 import re
 from dataclasses import asdict
@@ -32,6 +33,18 @@ CONVERTIBLE_SOURCE_EXTENSIONS = {"doc", "ppt", "pptx"}
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or "item"
+
+
+def _mermaid_label(value: str) -> str:
+    return html.escape(value, quote=True).replace("\n", "<br/>")
+
+
+def _mermaid_node(node_id: str, label: str) -> str:
+    return f'{node_id}["{_mermaid_label(label)}"]'
+
+
+def _mermaid_edge_label(value: str) -> str:
+    return value.replace("|", "/")
 
 
 def _vector_literal(values: list[float]) -> str:
@@ -286,10 +299,24 @@ def _build_change_plan(
             footnote_pages.add(latest_page)
 
         rel_lines = []
+        source_node = _mermaid_node(entity["slug"], entity["title"])
         for rel in entity_relations.get(entity["title"], []):
             other = rel["target_title"] if rel["source_title"] == entity["title"] else rel["source_title"]
-            rel_lines.append(f"    {entity['title']}[{entity['title']}] -->|{rel['relation_type']}| {_slugify(other)}[{other}]")
-        mermaid_block = "```mermaid\ngraph TD\n" + "\n".join(rel_lines) + "\n```" if rel_lines else f"```mermaid\ngraph TD\n    Source[{source_title}] --> Node[{entity['title']}]\n    Node --> Vault[Compiled Wiki]\n```"
+            target_node = _mermaid_node(_slugify(other), other)
+            rel_lines.append(
+                f"    {source_node} -->|{_mermaid_edge_label(rel['relation_type'])}| {target_node}"
+            )
+        mermaid_block = (
+            "```mermaid\ngraph TD\n" + "\n".join(rel_lines) + "\n```"
+            if rel_lines
+            else (
+                "```mermaid\n"
+                "graph TD\n"
+                f"    {_mermaid_node(f'source-{_slugify(source_title)}', source_title)} --> {source_node}\n"
+                f"    {source_node} --> {_mermaid_node('compiled-wiki', 'Compiled Wiki')}\n"
+                "```"
+            )
+        )
 
         doc_content = f"""{summary}
 
@@ -781,10 +808,10 @@ async def process_run(run_id: str, workspace_id: str, attempts: int = 1) -> None
 
 ```mermaid
 graph TD
-    Source[{source_document['title']}] --> Compiler[Compiler]
-    Compiler --> Wiki[Compiled Wiki]
-    Wiki --> Search[Hybrid Search]
-    Wiki --> Agents[Agent Operating Plane]
+    {_mermaid_node(f"source-{_slugify(source_document['title'])}", source_document['title'])} --> {_mermaid_node("compiler", "Compiler")}
+    {_mermaid_node("compiler", "Compiler")} --> {_mermaid_node("compiled-wiki", "Compiled Wiki")}
+    {_mermaid_node("compiled-wiki", "Compiled Wiki")} --> {_mermaid_node("hybrid-search", "Hybrid Search")}
+    {_mermaid_node("compiled-wiki", "Compiled Wiki")} --> {_mermaid_node("agent-plane", "Agent Operating Plane")}
 ```
 
 ## Recent Updates

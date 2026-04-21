@@ -181,3 +181,130 @@ select {
 .muted {
   @apply text-sm text-muted-foreground;
 }
+
+/* ── Markdown ── */
+
+.markdown-content {
+  @apply text-sm leading-7 text-slate-700;
+}
+
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  @apply font-semibold tracking-tight text-slate-900;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content h1 {
+  @apply text-2xl;
+}
+
+.markdown-content h2 {
+  @apply text-xl;
+}
+
+.markdown-content h3 {
+  @apply text-lg;
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content section {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.5rem;
+}
+
+.markdown-content ul {
+  list-style: disc;
+}
+
+.markdown-content ol {
+  list-style: decimal;
+}
+
+.markdown-content li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content a {
+  @apply font-medium text-blue-600 underline underline-offset-2;
+}
+
+.markdown-content blockquote {
+  @apply border-l-4 border-slate-200 pl-4 italic text-slate-600;
+}
+
+.markdown-content hr {
+  @apply my-4 border-slate-200;
+}
+
+.markdown-inline-code {
+  @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800;
+}
+
+.markdown-content table {
+  @apply w-full border-collapse overflow-hidden rounded-lg border border-slate-200;
+}
+
+.markdown-content thead {
+  @apply bg-slate-50;
+}
+
+.markdown-content th,
+.markdown-content td {
+  @apply border border-slate-200 px-3 py-2 text-left align-top;
+}
+
+.markdown-content th {
+  @apply text-xs font-semibold uppercase tracking-wider text-slate-500;
+}
+
+.markdown-content tbody tr:nth-child(even) {
+  @apply bg-slate-50/50;
+}
+
+.markdown-mermaid,
+.markdown-mermaid-loading,
+.markdown-mermaid-fallback {
+  @apply rounded-xl border border-slate-200 bg-slate-50 p-4;
+}
+
+.markdown-mermaid {
+  @apply overflow-auto;
+}
+
+.markdown-mermaid svg {
+  @apply mx-auto h-auto max-w-full;
+}
+
+.markdown-mermaid-loading {
+  @apply text-sm text-slate-500;
+}
+
+.markdown-mermaid-error {
+  @apply mb-3 text-sm font-medium text-red-600;
+}
+
+.markdown-mermaid-fallback pre {
+  @apply overflow-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100;
+}

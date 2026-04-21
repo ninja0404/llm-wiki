@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { MarkdownContent } from "@/components/markdown-content";
 import { PageFrame } from "@/components/page-frame";
 import { apiFetch } from "@/lib/api";
 
@@ -100,11 +101,11 @@ export default async function RevisionDetailPage({
       <div className="card-grid">
         <div className="panel">
           <h2>Current Content</h2>
-          <div className="code-block">{revision.data.content_md}</div>
+          <MarkdownContent content={revision.data.content_md} className="max-h-96 overflow-auto rounded-lg border border-slate-200 bg-white p-4" />
         </div>
         <div className="panel">
           <h2>Previous Content</h2>
-          <div className="code-block">{revision.data.previous_content_md ?? "(no previous revision)"}</div>
+          <MarkdownContent content={revision.data.previous_content_md ?? "(no previous revision)"} className="max-h-96 overflow-auto rounded-lg border border-slate-200 bg-white p-4" />
         </div>
       </div>
     </PageFrame>
