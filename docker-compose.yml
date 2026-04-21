@@ -25,6 +25,11 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   minio:
     image: minio/minio:latest
@@ -37,6 +42,11 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   platform-api:
     build:
@@ -59,9 +69,9 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8000:8000"
 
@@ -82,9 +92,9 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
 
   mcp-service:
     build:
@@ -103,6 +113,10 @@ services:
       MCP_URL: ${MCP_URL:-http://localhost:8080/mcp}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
       platform-api:
         condition: service_started

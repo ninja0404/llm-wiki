@@ -1,7 +1,7 @@
-"""Add users.is_platform_admin.
+"""Backfill users.is_platform_admin for pre-flag baselines.
 
 Revision ID: 003_platform_admin_flag
-Revises: 002_platform_admin
+Revises: 001_initial_schema
 """
 from typing import Sequence, Union
 
